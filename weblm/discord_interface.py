@@ -11,7 +11,7 @@ from discord.ext import commands
 from playwright.async_api import async_playwright
 
 from .controller import Command, Controller, Prompt, help_msg
-from .crawler import AsyncCrawler
+from .async_crawler import AsyncCrawler
 
 co = cohere.Client(os.environ.get("COHERE_KEY"))
 

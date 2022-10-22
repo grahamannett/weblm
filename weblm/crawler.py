@@ -4,24 +4,28 @@ import re
 import time
 from os.path import exists
 from sys import platform
+from typing import List
+
 
 from playwright.async_api import async_playwright
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, BrowserContext
 
-black_listed_elements = set([
-    "html",
-    "head",
-    "title",
-    "meta",
-    "iframe",
-    "body",
-    "script",
-    "style",
-    "path",
-    "svg",
-    "br",
-    "::marker",
-])
+black_listed_elements = set(
+    [
+        "html",
+        "head",
+        "title",
+        "meta",
+        "iframe",
+        "body",
+        "script",
+        "style",
+        "path",
+        "svg",
+        "br",
+        "::marker",
+    ]
+)
 
 URL_PATTERN = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
 WINDOW_SIZE = {"width": 1280, "height": 1080}
@@ -39,12 +43,10 @@ def replace_special_fields(cmd):
 
 
 class Crawler:
-
     def __init__(self):
-        self.browser = sync_playwright().start().chromium.launch(headless=False,)
+        self.browser = sync_playwright().start().chromium.launch(headless=False, traces_dir="traces")
         self.context = self.browser.new_context(
-            user_agent=
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
         )
 
         self.page = self.context.new_page()
@@ -112,11 +114,7 @@ class Crawler:
         page = self.page
         tree = self.client.send(
             "DOMSnapshot.captureSnapshot",
-            {
-                "computedStyles": ["display"],
-                "includeDOMRects": True,
-                "includePaintOrder": True
-            },
+            {"computedStyles": ["display"], "includeDOMRects": True, "includePaintOrder": True},
         )
         device_pixel_ratio = page.evaluate("window.devicePixelRatio")
         win_scroll_x = page.evaluate("window.scrollX")
@@ -125,10 +123,11 @@ class Crawler:
         win_left_bound = page.evaluate("window.pageXOffset")
         win_width = page.evaluate("window.screen.width")
         win_height = page.evaluate("window.screen.height")
-        elements_of_interest = self._crawl(tree, win_upper_bound, win_width, win_left_bound, win_height,
-                                           device_pixel_ratio)
+        elements_of_interest = self._crawl(tree, win_upper_bound, win_width, win_left_bound, win_height, device_pixel_ratio)
 
         print("Parsing time: {:0.2f} seconds".format(time.time() - start))
+
+        breakpoint()
         return elements_of_interest
 
     def _crawl(self, tree, win_upper_bound, win_width, win_left_bound, win_height, device_pixel_ratio):
@@ -145,15 +144,13 @@ class Crawler:
         percentage_progress_start = 1
         percentage_progress_end = 2
 
-        page_state_as_text.append({
-            "x":
-                0,
-            "y":
-                0,
-            "text":
-                "[scrollbar {:0.2f}-{:0.2f}%]".format(round(percentage_progress_start, 2),
-                                                      round(percentage_progress_end)),
-        })
+        page_state_as_text.append(
+            {
+                "x": 0,
+                "y": 0,
+                "text": "[scrollbar {:0.2f}-{:0.2f}%]".format(round(percentage_progress_start, 2), round(percentage_progress_end)),
+            }
+        )
 
         strings = tree["strings"]
         document = tree["documents"][0]
@@ -191,7 +188,7 @@ class Crawler:
                 return "link"
             elif node_name in ["select", "img", "input"]:
                 return node_name
-            elif (node_name in "button" or has_click_handler):  # found pages that needed this quirk
+            elif node_name in "button" or has_click_handler:  # found pages that needed this quirk
                 return "button"
             else:
                 return "text"
@@ -229,7 +226,7 @@ class Crawler:
             # even if the anchor is nested in another anchor, we set the "root" for all descendants to be ::Self
             if node_name in tag or element_attributes.get("role") in tag:
                 value = (True, node_id)
-            elif (is_parent_desc_anchor):  # reuse the parent's anchor_id (which could be much higher in the tree)
+            elif is_parent_desc_anchor:  # reuse the parent's anchor_id (which could be much higher in the tree)
                 value = (True, anchor_id)
             else:
                 value = (
@@ -251,11 +248,9 @@ class Crawler:
 
             is_ancestor_of_anchor, anchor_id = add_to_hash_tree(anchor_ancestry, ["a"], index, node_name, node_parent)
 
-            is_ancestor_of_button, button_id = add_to_hash_tree(button_ancestry, ["button"], index, node_name,
-                                                                node_parent)
+            is_ancestor_of_button, button_id = add_to_hash_tree(button_ancestry, ["button"], index, node_name, node_parent)
 
-            is_ancestor_of_select, select_id = add_to_hash_tree(select_ancestry, ["select"], index, node_name,
-                                                                node_parent)
+            is_ancestor_of_select, select_id = add_to_hash_tree(select_ancestry, ["select"], index, node_name, node_parent)
 
             try:
                 cursor = layout_node_index.index(select_id) if is_ancestor_of_select else layout_node_index.index(index)
@@ -281,8 +276,12 @@ class Crawler:
             elem_lower_bound = y + height
 
             # comment this bit out to process the whole thing
-            partially_is_in_viewport = (elem_left_bound < win_right_bound and elem_right_bound >= win_left_bound and
-                                        elem_top_bound < win_lower_bound and elem_lower_bound >= win_upper_bound)
+            partially_is_in_viewport = (
+                elem_left_bound < win_right_bound
+                and elem_right_bound >= win_left_bound
+                and elem_top_bound < win_lower_bound
+                and elem_lower_bound >= win_upper_bound
+            )
 
             if not partially_is_in_viewport:
                 continue
@@ -304,7 +303,7 @@ class Crawler:
                     ancestor_node_key = str(button_id)
                 elif is_ancestor_of_select:
                     ancestor_node_key = str(select_id)
-            ancestor_node = (None if not ancestor_exception else child_nodes.setdefault(str(ancestor_node_key), []))
+            ancestor_node = None if not ancestor_exception else child_nodes.setdefault(str(ancestor_node_key), [])
 
             if node_name == "#text" and ancestor_exception:
                 text = strings[node_value[index]]
@@ -331,9 +330,11 @@ class Crawler:
 
             if node_value[index] >= 0:
                 element_node_value = strings[node_value[index]]
-                if element_node_value == "|":  #commonly used as a seperator, does not add much context - lets save ourselves some token space
+
+                # commonly used as a seperator, does not add much context - lets save ourselves some token space
+                if element_node_value == "|":
                     continue
-            elif (node_name == "input" and index in input_value_index and element_node_value is None):
+            elif node_name == "input" and index in input_value_index and element_node_value is None:
                 node_input_text_index = input_value_index.index(index)
                 text_index = input_value_values[node_input_text_index]
                 if node_input_text_index >= 0 and text_index >= 0:
@@ -343,18 +344,20 @@ class Crawler:
             if ancestor_exception and (node_name not in ["a", "button", "select"]):
                 continue
 
-            elements_in_view_port.append({
-                "node_index": str(index),
-                "backend_node_id": backend_node_id[index],
-                "node_name": node_name,
-                "node_value": element_node_value,
-                "node_meta": meta_data,
-                "is_clickable": index in is_clickable,
-                "origin_x": int(x),
-                "origin_y": int(y),
-                "center_x": int(x + (width / 2)),
-                "center_y": int(y + (height / 2)),
-            })
+            elements_in_view_port.append(
+                {
+                    "node_index": str(index),
+                    "backend_node_id": backend_node_id[index],
+                    "node_name": node_name,
+                    "node_value": element_node_value,
+                    "node_meta": meta_data,
+                    "is_clickable": index in is_clickable,
+                    "origin_x": int(x),
+                    "origin_y": int(y),
+                    "center_x": int(x + (width / 2)),
+                    "center_y": int(y + (height / 2)),
+                }
+            )
 
         # lets filter further to remove anything that does not hold any text nor has click handlers + merge text from leaf#text nodes with the parent
         elements_of_interest = []
@@ -376,11 +379,11 @@ class Crawler:
 
             if node_index in child_nodes:
                 for child in child_nodes.get(node_index):
-                    entry_type = child.get('type')
-                    entry_value = child.get('value')
+                    entry_type = child.get("type")
+                    entry_value = child.get("value")
 
                     if entry_type == "attribute":
-                        entry_key = child.get('key')
+                        entry_key = child.get("key")
                         meta_data.append(f'{entry_key}="{entry_value}"')
                     else:
                         inner_text += f"{entry_value} "
@@ -398,16 +401,15 @@ class Crawler:
             converted_node_name = convert_name(node_name, is_clickable)
 
             # not very elegant, more like a placeholder
-            if converted_node_name not in ["button", "link", "input", "img", "textarea", "select"
-                                          ] and inner_text.strip() == "":
+            if converted_node_name not in ["button", "link", "input", "img", "textarea", "select"] and inner_text.strip() == "":
                 continue
             elif converted_node_name == "button" and meta == "" and inner_text.strip() == "":
                 continue
 
             page_element_buffer[id_counter] = element
 
-            meta = re.sub('\s+', ' ', meta)
-            inner_text = re.sub('\s+', ' ', inner_text)
+            meta = re.sub("\s+", " ", meta)
+            inner_text = re.sub("\s+", " ", inner_text)
 
             if inner_text != "":
                 elements_of_interest.append(f"""{converted_node_name} {id_counter}{meta} \"{inner_text}\"""")
@@ -428,6 +430,8 @@ class Crawler:
 
         if cmd.startswith("SCROLL UP"):
             self.scroll("up")
+        elif cmd.startswith("summarize"):
+
         elif cmd.startswith("SCROLL DOWN"):
             self.scroll("down")
         elif cmd.startswith("click"):
@@ -441,131 +445,8 @@ class Crawler:
             text = " ".join(text)
             # Strip leading and trailing double quotes
             text = text[1:-1]
-            text += '\n'
+            text += "\n"
             self.type(id, text)
 
         time.sleep(2)
 
-
-class AsyncCrawler(Crawler):
-
-    def __init__(self, playwright) -> None:
-        self.playwright = playwright
-
-    async def _init_browser(self):
-        self.browser = await self.playwright.chromium.launch(headless=True,)
-        self.context = await self.browser.new_context(
-            user_agent=
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
-        )
-
-        self.page = await self.context.new_page()
-        await self.page.set_viewport_size({"width": 1280, "height": 1080})
-
-    async def screenshot(self):
-        _path = "screenshot.png"
-        await self.page.screenshot(path=_path)
-        return _path
-
-    async def crawl(self):
-        start = time.time()
-
-        page = self.page
-        tree = await self.client.send(
-            "DOMSnapshot.captureSnapshot",
-            {
-                "computedStyles": ["display"],
-                "includeDOMRects": True,
-                "includePaintOrder": True
-            },
-        )
-        device_pixel_ratio = await page.evaluate("window.devicePixelRatio")
-        win_scroll_x = await page.evaluate("window.scrollX")
-        win_scroll_y = await page.evaluate("window.scrollY")
-        win_upper_bound = await page.evaluate("window.pageYOffset")
-        win_left_bound = await page.evaluate("window.pageXOffset")
-        win_width = await page.evaluate("window.screen.width")
-        win_height = await page.evaluate("window.screen.height")
-        elements_of_interest = self._crawl(tree, win_upper_bound, win_width, win_left_bound, win_height,
-                                           device_pixel_ratio)
-
-        print("Parsing time: {:0.2f} seconds".format(time.time() - start))
-        return elements_of_interest
-
-    async def go_to_page(self, url):
-        await self.page.goto(url=url if "://" in url else "http://" + url)
-        self.client = await self.page.context.new_cdp_session(self.page)
-        self.page_element_buffer = {}
-
-    async def scroll(self, direction):
-        if direction == "up":
-            await self.page.evaluate(
-                "(document.scrollingElement || document.body).scrollTop = (document.scrollingElement || document.body).scrollTop - window.innerHeight;"
-            )
-        elif direction == "down":
-            await self.page.evaluate(
-                "(document.scrollingElement || document.body).scrollTop = (document.scrollingElement || document.body).scrollTop + window.innerHeight;"
-            )
-
-    async def click(self, id):
-        # Inject javascript into the page which removes the target= attribute from all links
-        js = """
-        links = document.getElementsByTagName("a");
-        for (var i = 0; i < links.length; i++) {
-            links[i].removeAttribute("target");
-        }
-        """
-        await self.page.evaluate(js)
-
-        element = self.page_element_buffer.get(int(id))
-        if element:
-            x = element.get("center_x")
-            y = element.get("center_y")
-
-            height, width = WINDOW_SIZE["height"], WINDOW_SIZE["width"]
-
-            x_d = max(0, x - width)
-            x_d += 5 * int(x_d > 0)
-            y_d = max(0, y - height)
-            y_d += 5 * int(y_d > 0)
-
-            if x_d or y_d:
-                await self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
-
-            await self.page.mouse.click(x - x_d, y - y_d)
-        else:
-            print("Could not find element")
-
-    async def type(self, id, text):
-        await self.click(id)
-        await self.page.evaluate(f"() => document.activeElement.value = ''")
-        await self.page.keyboard.type(text)
-
-    async def enter(self):
-        await self.page.keyboard.press("Enter")
-
-    async def run_cmd(self, cmd):
-        print("cmd", cmd)
-        cmd = replace_special_fields(cmd.strip())
-
-        if cmd.startswith("SCROLL UP"):
-            await self.scroll("up")
-        elif cmd.startswith("SCROLL DOWN"):
-            await self.scroll("down")
-        elif cmd.startswith("click"):
-            commasplit = cmd.split(",")
-            id = commasplit[0].split(" ")[2]
-            await self.click(id)
-        elif cmd.startswith("type"):
-            spacesplit = cmd.split(" ")
-            id = spacesplit[2]
-            text = spacesplit[3:]
-            text = " ".join(text)
-            # Strip leading and trailing double quotes
-            text = text[1:-1]
-            text += '\n'
-            await self.type(id, text)
-        else:
-            raise Exception(f"Invalid command: {cmd}")
-
-        time.sleep(2)
