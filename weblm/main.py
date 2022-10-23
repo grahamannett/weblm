@@ -17,14 +17,16 @@ from .crawler import URL_PATTERN, Crawler
 
 co = cohere.Client(os.environ.get("COHERE_KEY"), check_api_key=False)
 
-if (__name__ == "__main__"):
+if __name__ == "__main__":
 
     def reset():
         _crawler = Crawler()
 
         def print_help():
-            print("(g) to visit url\n(u) scroll up\n(d) scroll dow\n(c) to click\n(t) to type\n" +
-                  "(h) to view commands again\n(r) to run suggested command\n(o) change objective")
+            print(
+                "(g) to visit url\n(u) scroll up\n(d) scroll dow\n(c) to click\n(t) to type\n"
+                + "(h) to view commands again\n(r) to run suggested command\n(o) change objective"
+            )
 
         objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
         print("\nWelcome to WebLM! What is your objective?")
@@ -51,8 +53,8 @@ if (__name__ == "__main__"):
         elif response == "back":
             controller.reset_state()
         elif response is not None and re.match(
-                f"goto {URL_PATTERN}",
-                response,
+            f"goto {URL_PATTERN}",
+            response,
         ):
             url = re.match(URL_PATTERN, response[5:]).group(0)
             response = None
@@ -65,7 +67,7 @@ if (__name__ == "__main__"):
         response = controller.step(crawler.page.url, content, response)
 
         if isinstance(response, Command):
-            crawler.run_cmd(str(response))
+            crawler.run_cmd(str(response), controller=controller)
             response = None
         elif isinstance(response, Prompt):
             response = input(str(response))

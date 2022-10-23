@@ -10,6 +10,8 @@ from typing import List
 from playwright.async_api import async_playwright
 from playwright.sync_api import sync_playwright, BrowserContext
 
+from .parser import Parser, TasksInterface
+
 black_listed_elements = set(
     [
         "html",
@@ -123,14 +125,12 @@ class Crawler:
 
         print("Parsing time: {:0.2f} seconds".format(time.time() - start))
 
-        breakpoint()
         return elements_of_interest
 
     def _crawl(self, tree, win_upper_bound, win_width, win_left_bound, win_height, device_pixel_ratio):
         page_element_buffer = self.page_element_buffer
 
         page_state_as_text = []
-
         if platform == "darwin" and device_pixel_ratio == 1:  # lies
             device_pixel_ratio = 2
 
@@ -420,13 +420,17 @@ class Crawler:
 
         return elements_of_interest
 
-    def run_cmd(self, cmd):
+    def run_cmd(self, cmd, controller=None):
         print("cmd", cmd)
         cmd = replace_special_fields(cmd.strip())
 
         if cmd.startswith("SCROLL UP"):
             self.scroll("up")
-        elif cmd.startswith("summarize"):
+        elif cmd.startswith("summary"):
+            short_text = Parser(self.page.content()).process()
+            task_interface = TasksInterface()
+            short_text_with_prompt = task_interface.summary(short_text)
+            controller.use_text(short_text_with_prompt)
 
         elif cmd.startswith("SCROLL DOWN"):
             self.scroll("down")
