@@ -45,7 +45,7 @@ def replace_special_fields(cmd):
 
 
 class Crawler:
-    def __init__(self):
+    def __init__(self, keep_device_ratio: bool = False):
         self.browser = sync_playwright().start().chromium.launch(headless=False, traces_dir="traces")
         self.context = self.browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
@@ -53,6 +53,8 @@ class Crawler:
 
         self.page = self.context.new_page()
         self.page.set_viewport_size(WINDOW_SIZE)
+
+        self.keep_device_ratio = keep_device_ratio
 
     def go_to_page(self, url):
         self.page.goto(url=url if "://" in url else "http://" + url)
@@ -135,7 +137,7 @@ class Crawler:
         page_element_buffer = self.page_element_buffer
 
         page_state_as_text = []
-        if platform == "darwin" and device_pixel_ratio == 1:  # lies
+        if (platform == "darwin") and (device_pixel_ratio == 1) and not self.keep_device_ratio:  # lies
             device_pixel_ratio = 2
 
         win_right_bound = win_left_bound + win_width * 2
