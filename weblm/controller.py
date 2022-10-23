@@ -681,5 +681,7 @@ class Controller:
             pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE), self._pruned_prioritized_elements))
         elif "type" in self._action:
             pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._pruned_prioritized_elements))
+        elif "summary" in self._action:
+            pruned_elements = ["summary of text on page"]
 
         return self.generate_command(url, pruned_elements, response)

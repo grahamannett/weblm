@@ -8,6 +8,7 @@
 import os
 import re
 import time
+from distutils.util import strtobool
 from multiprocessing import Pool
 
 import cohere
@@ -16,11 +17,12 @@ from .controller import Command, Controller, Prompt
 from .crawler import URL_PATTERN, Crawler
 
 co = cohere.Client(os.environ.get("COHERE_KEY"), check_api_key=False)
+keep_device_ratio = strtobool(os.environ.get("KEEP_DEVICE_RATIO", "False"))
 
 if __name__ == "__main__":
 
     def reset():
-        _crawler = Crawler()
+        _crawler = Crawler(keep_device_ratio=keep_device_ratio)
 
         def print_help():
             print(
