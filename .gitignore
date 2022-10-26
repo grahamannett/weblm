@@ -5,5 +5,4 @@ examples.json
 poetry.lock
 screenshot.png
 **/.DS_Store
-
 .envrc
