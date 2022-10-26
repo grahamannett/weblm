@@ -45,8 +45,8 @@ def replace_special_fields(cmd):
 
 
 class Crawler:
-    def __init__(self, keep_device_ratio: bool = False):
-        self.browser = sync_playwright().start().chromium.launch(headless=False, traces_dir="traces")
+    def __init__(self, keep_device_ratio: bool = False, headless: bool = False):
+        self.browser = sync_playwright().start().chromium.launch(headless=headless)
         self.context = self.browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
         )
@@ -291,10 +291,24 @@ class Crawler:
             meta_data = []
 
             # inefficient to grab the same set of keys for kinds of objects but its fine for now
-            element_attributes = find_attributes(attributes[index], [
-                "type", "placeholder", "aria-label", "name", "class", "id", "title", "alt", "role", "value",
-                "aria-labelledby", "aria-description", "aria-describedby"
-            ])
+            element_attributes = find_attributes(
+                attributes[index],
+                [
+                    "type",
+                    "placeholder",
+                    "aria-label",
+                    "name",
+                    "class",
+                    "id",
+                    "title",
+                    "alt",
+                    "role",
+                    "value",
+                    "aria-labelledby",
+                    "aria-description",
+                    "aria-describedby",
+                ],
+            )
 
             ancestor_exception = is_ancestor_of_anchor or is_ancestor_of_button or is_ancestor_of_select
             ancestor_node_key = None
@@ -313,8 +327,11 @@ class Crawler:
                     continue
                 ancestor_node.append({"type": "type", "value": text})
             else:
-                if (node_name == "input" and element_attributes.get("type")
-                        == "submit") or node_name == "button" or element_attributes.get("role") == "button":
+                if (
+                    (node_name == "input" and element_attributes.get("type") == "submit")
+                    or node_name == "button"
+                    or element_attributes.get("role") == "button"
+                ):
                     node_name = "button"
                     element_attributes.pop("type", None)  # prevent [button ... (button)..]
                     element_attributes.pop("role", None)  # prevent [button ... (button)..]
@@ -391,7 +408,7 @@ class Crawler:
                         inner_text += f"{entry_value} "
 
             if len(meta_data) > 2 or inner_text != "":
-                meta_data = list(filter(lambda x: not re.match("(class|id)=\".+\"", x), meta_data))
+                meta_data = list(filter(lambda x: not re.match('(class|id)=".+"', x), meta_data))
 
             if meta_data:
                 meta_string = " ".join(meta_data)
@@ -455,4 +472,3 @@ class Crawler:
             self.type(id, text)
 
         time.sleep(2)
-
