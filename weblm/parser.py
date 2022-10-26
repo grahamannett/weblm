@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
+from .tasks_stubs import summary_stub
 
 import bs4
 from readability import Document
@@ -9,18 +10,18 @@ from readability import Document
 class LMTasks:
     prompt: str = None
 
-    def __call__(self, text: str) -> str:
-        return f"{self.prompt} {text}"
+    def __call__(self, text: str, **kwargs) -> str:
+        return self.prompt.format(text=text, **kwargs)
 
 
 @dataclass
 class SummaryTask(LMTasks):
-    prompt: str = "summarize the following passage:"
+    prompt = summary_stub
 
 
 @dataclass
 class QuestionAnsweringTask(LMTasks):
-    prompt: str = "answer the following question:"
+    prompt: str = "passage:{text}\nanswer the following question:{question}"
 
 
 class TasksInterface:

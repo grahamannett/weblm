@@ -289,7 +289,7 @@ class Controller:
         Returns:
             str: the most likely option from `options`
         """
-        num_options = len(options)
+        num_options = min(len(options), 128)
         with ThreadPoolExecutor(num_options) as pp:
             _lh = pp.map(
                 _fn,
@@ -583,8 +583,40 @@ class Controller:
 
         return (self._action + chosen_element + text).strip()
 
-    def use_text(self, *args, **kwargs):
-        pass
+    def use_text(
+        self,
+        prompt: str,
+        model: str = MODEL,
+        max_tokens: int = 192,
+        temperature: float = 0.5,
+        k: int = 0,
+        p: int = 1,
+        stop_sequences: List[str] = ["--"],
+        return_likelihoods: str = "GENERATION",
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
+        num_generations: int = 1,
+        return_text_only: bool = True,
+        **kwargs,
+    ):
+        response = self.co.generate(
+            prompt=prompt,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            k=k,
+            p=p,
+            frequency_penalty=frequency_penalty,
+            num_generations=num_generations,
+            presence_penalty=presence_penalty,
+            stop_sequences=stop_sequences,
+            return_likelihoods=return_likelihoods,
+        )
+
+        if return_text_only:
+            response = [gen.text for gen in response.generations]
+
+        return response
 
     def generate_command(self, url: str, pruned_elements: List[str], response: str = None):
         state = self._construct_state(url, pruned_elements)
