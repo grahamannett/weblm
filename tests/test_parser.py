@@ -10,7 +10,6 @@ from weblm.parser import Parser, TasksInterface
 
 class TestParser(unittest.TestCase):
     def setUp(self) -> None:
-        self.api_key = os.environ.get("COHERE_API_KEY")
 
         # find a better webpage, maybe news or something from a common benchmark?
         self.webpage = "https://txt.cohere.ai/free-developer-tier-announcement/"
