@@ -27,6 +27,6 @@ class TestParser(unittest.TestCase):
         self.assertIsNotNone(readable_text)
 
         task_interface = TasksInterface()
-        short_text_with_prompt = task_interface.summary(readable_text)
+        short_text_with_prompt = task_interface.summary(text=readable_text)
         summary_response = self.controller.use_text(prompt=short_text_with_prompt)
         self.assertIsNotNone(summary_response)
