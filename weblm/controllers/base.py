@@ -456,8 +456,8 @@ class Controller:
                         key=lambda x: x.likelihood,
                     ).text
                     print(text)
-                except Controller.exception as e:
-                    print(Controller.exception_message.format(e))
+                except Controller.client_exception as e:
+                    print(Controller.client_exception_message.format(e))
                     continue
         else:
             text = ""
