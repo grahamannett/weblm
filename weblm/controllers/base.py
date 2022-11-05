@@ -13,7 +13,6 @@ from typing import Any, Callable, DefaultDict, Dict, List, Tuple, Union
 
 import numpy as np
 
-
 from .stubs import *
 
 
@@ -119,6 +118,7 @@ class Controller:
         self.previous_commands: List[str] = []
         self.moments: List[Tuple[str, str, str]] = []
         self.user_responses: DefaultDict[str, int] = defaultdict(int)
+
         self.reset_state()
 
     def embed(self, texts: List[str], truncate: str = "RIGHT") -> Any:
@@ -285,22 +285,6 @@ class Controller:
 
         self.user_responses = responses_to_save
         print(f"Responses being saved:\n{dict(responses_to_save)}")
-
-    def save_responses(self):
-        keys_to_save = ["y", "n", "s", "command", "success", "cancel"]
-        # Check if data file already exists
-        responses_filepath = "responses.csv"
-        if os.path.isfile(responses_filepath):
-            print("File exists")
-            with open(responses_filepath, "a+") as fd:
-                wr = csv.writer(fd, quoting=csv.QUOTE_ALL)
-                wr.writerow([self.user_responses[key] for key in keys_to_save])
-        else:
-            print("No data available")
-            with open(responses_filepath, "w+") as fd:
-                wr = csv.writer(fd, quoting=csv.QUOTE_ALL)
-                wr.writerow(keys_to_save)
-                wr.writerow([self.user_responses[key] for key in keys_to_save])
 
     def _shorten_prompt(self, url, elements, examples, *rest_of_prompt, target: int = MAX_SEQ_LEN):
         state = self._construct_state(url, elements)
