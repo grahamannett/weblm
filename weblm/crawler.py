@@ -449,14 +449,14 @@ class Crawler:
 
         if cmd.startswith("SCROLL UP"):
             self.scroll("up")
+        elif cmd.startswith("SCROLL DOWN"):
+            self.scroll("down")
         elif cmd.startswith("summary"):
             short_text = Parser(self.page.content()).process()
             task_interface = TasksInterface()
             short_text_with_prompt = task_interface.summary(short_text)
             controller.use_text(short_text_with_prompt)
 
-        elif cmd.startswith("SCROLL DOWN"):
-            self.scroll("down")
         elif cmd.startswith("click"):
             commasplit = cmd.split(",")
             id = commasplit[0].split(" ")[2]
@@ -472,3 +472,20 @@ class Crawler:
             self.type(id, text)
 
         time.sleep(2)
+
+
+# class Scroll:
+#     ACTION: str = "SCROLL"
+
+#     def __call__(self, direction: str , crawler: Crawler, **kwds):
+#         if
+#         matchc direction:
+#             case "down":
+#                 crawler.scroll("down")
+#             case "up":
+#                 crawler.scroll("up")
+
+
+# class RunCommands:
+#     scroll_up: Scroll()
+#     scroll_down: Scroll()

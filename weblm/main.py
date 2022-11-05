@@ -13,13 +13,16 @@ from multiprocessing import Pool
 
 import cohere
 
-from .controller import Command, Controller, Prompt
+# from .controller import Command, Controller, Prompt
+from .controllers import Command, Controller, Prompt
 from .crawler import URL_PATTERN, Crawler
+from .data_saver import CSVSaver as DataSaver
 
 co = cohere.Client(os.environ.get("COHERE_KEY"), check_api_key=False)
 keep_device_ratio = strtobool(os.environ.get("KEEP_DEVICE_RATIO", "False"))
 
 if __name__ == "__main__":
+    data_saver = DataSaver()
 
     def reset():
         _crawler = Crawler(keep_device_ratio=keep_device_ratio)
@@ -46,11 +49,11 @@ if __name__ == "__main__":
     crawler.go_to_page("google.com")
     while True:
         if response == "cancel":
-            controller.save_responses()
+            data_saver.save_responses(controller.user_responses)
             crawler, controller = reset()
         elif response == "success":
             controller.success()
-            controller.save_responses()
+            data_saver.save_responses(controller.user_responses)
             exit(0)
         elif response == "back":
             controller.reset_state()
