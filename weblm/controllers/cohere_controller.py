@@ -3,12 +3,43 @@ from typing import List
 import cohere
 import numpy as np
 
-from .base import BaseController, truncate_left
+from .base import Controller, truncate_left
 
 
-class CohereController(BaseController):
+def make_fn(generate_func, tokenize_func, model):
+    def func(x):
+        if len(x) == 3:
+            option, prompt, self = x
+            return_likelihoods = "ALL"
+        elif len(x) == 4:
+            option, prompt, self, return_likelihoods = x
+
+        while True:
+            try:
+                if len(tokenize_func(prompt)) > 2048:
+                    prompt = truncate_left(tokenize_func, prompt)
+                return (
+                    generate_func(prompt=prompt, max_tokens=0, model=model, return_likelihoods=return_likelihoods)
+                    .generations[0]
+                    .likelihood,
+                    option,
+                )
+            except cohere.error.CohereError as e:
+                print(f"Cohere fucked up: {e}")
+                continue
+            except ConnectionError as e:
+                print(f"Connection error: {e}")
+                continue
+
+    return func
+
+
+class CohereController(Controller):
     MODEL = "xlarge"
     cohere_client = None
+
+    Controller.exception = cohere.error.CohereError
+    Controller.exception_message = "Cohere fucked up11: {0}"
 
     def __init__(self, co: cohere.Client, objective: str, **kwargs):
         super().__init__(objective)
@@ -17,7 +48,7 @@ class CohereController(BaseController):
         if CohereController.cohere_client is None:
             CohereController.cohere_client = co
 
-        self._fn = self.make_fn()
+        self._fn = make_fn(self.generate, self.tokenize, self.MODEL)
 
     def embed(self, texts: List[str], truncate: str = "RIGHT") -> cohere.embeddings.Embeddings:
         return self.co.embed(texts=texts, truncate=truncate)
@@ -45,30 +76,3 @@ class CohereController(BaseController):
 
     def tokenize(self, text: str) -> cohere.tokenize.Tokens:
         return self.co.tokenize(text=text)
-
-    def make_fn(self):
-        def _fn(x):
-            if len(x) == 3:
-                option, prompt, self = x
-                return_likelihoods = "ALL"
-            elif len(x) == 4:
-                option, prompt, self, return_likelihoods = x
-
-            while True:
-                try:
-                    if len(self.co.tokenize(prompt)) > 2048:
-                        prompt = truncate_left(self.tokenize, prompt)
-                    return (
-                        self.generate(prompt=prompt, max_tokens=0, model=self.MODEL, return_likelihoods=return_likelihoods)
-                        .generations[0]
-                        .likelihood,
-                        option,
-                    )
-                except cohere.error.CohereError as e:
-                    print(f"Cohere fucked up: {e}")
-                    continue
-                except ConnectionError as e:
-                    print(f"Connection error: {e}")
-                    continue
-
-        return _fn
