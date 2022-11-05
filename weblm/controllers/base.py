@@ -91,7 +91,7 @@ def split_list_by_separators(l: List[Any], separator_sequences: List[List[Any]])
     return split_list
 
 
-class BaseController:
+class Controller:
     """A Cohere-powered controller that takes in a browser state and produces and action.
 
     The basic outline of this Controller's strategy is:
@@ -106,6 +106,8 @@ class BaseController:
     MAX_NUM_ELEMENTS = 50
     TYPEABLE = ["input", "select"]
     CLICKABLE = ["link", "button"]
+    exception = None
+    exception_message = "Base Exception Message: {0}"
 
     def __init__(self, objective: str):
         """
@@ -467,8 +469,8 @@ class BaseController:
                         key=lambda x: x.likelihood,
                     ).text
                     print(text)
-                except cohere.error.CohereError as e:
-                    print(f"Cohere fucked up: {e}")
+                except Controller.exception as e:
+                    print(Controller.exception_message.format(e))
                     continue
         else:
             text = ""
