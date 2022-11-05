@@ -12,7 +12,6 @@ from enum import Enum
 from typing import Any, Callable, DefaultDict, Dict, List, Tuple, Union
 
 import numpy as np
-from requests.exceptions import ConnectionError
 
 
 from .stubs import *
@@ -106,8 +105,8 @@ class Controller:
     MAX_NUM_ELEMENTS = 50
     TYPEABLE = ["input", "select"]
     CLICKABLE = ["link", "button"]
-    exception = None
-    exception_message = "Base Exception Message: {0}"
+    client_exception = None
+    client_exception_message = "Base Exception Message: {0}"
 
     def __init__(self, objective: str):
         """
@@ -115,29 +114,17 @@ class Controller:
             co (cohere.Client): a Cohere Client
             objective (str): the objective to accomplish
         """
+        self.client = None
         self.objective = objective
         self.previous_commands: List[str] = []
         self.moments: List[Tuple[str, str, str]] = []
         self.user_responses: DefaultDict[str, int] = defaultdict(int)
         self.reset_state()
 
-    def embed(
-        self,
-        texts: List[str],
-        truncate: str = "RIGHT",
-    ) -> Any:
+    def embed(self, texts: List[str], truncate: str = "RIGHT") -> Any:
         raise NotImplementedError("Implement on adapter")
 
-    def generate(
-        self,
-        prompt: str,
-        model: str,
-        temperature: float,
-        num_generations: int,
-        max_tokens: int,
-        stop_sequences: List[str],
-        return_likelihoods: str,
-    ) -> Any:
+    def generate(self, prompt: str, **kwargs) -> Any:
         raise NotImplementedError("Implement on adapter")
 
     def tokenize(self, prompt: str) -> Any:

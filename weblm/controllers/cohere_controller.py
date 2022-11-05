@@ -1,7 +1,7 @@
 from typing import List
 
 import cohere
-import numpy as np
+from requests.exceptions import ConnectionError
 
 from .base import Controller, truncate_left
 
@@ -42,12 +42,12 @@ class CohereController(Controller):
     MODEL = "xlarge"
     cohere_client = None
 
-    Controller.exception = cohere.error.CohereError
-    Controller.exception_message = "Cohere fucked up11: {0}"
+    Controller.client_exception = cohere.error.CohereError
+    Controller.client_exception_message = "Cohere fucked up: {0}"
 
     def __init__(self, co: cohere.Client, objective: str, **kwargs):
         super().__init__(objective)
-        self.co = co
+        self.client = co
 
         if CohereController.cohere_client is None:
             CohereController.cohere_client = co
@@ -55,7 +55,7 @@ class CohereController(Controller):
         self._fn = make_fn(generate_func=_generate_func(self.co), tokenize_func=self.tokenize, model=self.MODEL)
 
     def embed(self, texts: List[str], truncate: str = "RIGHT") -> cohere.embeddings.Embeddings:
-        return self.co.embed(texts=texts, truncate=truncate)
+        return self.client.embed(texts=texts, truncate=truncate)
 
     def generate(
         self,
@@ -68,7 +68,7 @@ class CohereController(Controller):
         return_likelihoods: str = "GENERATION",
     ) -> cohere.generation.Generations:
 
-        return _generate_func(self.co)(
+        return _generate_func(self.client)(
             prompt=prompt,
             model=model if model else self.MODEL,
             temperature=temperature,
@@ -79,4 +79,4 @@ class CohereController(Controller):
         )
 
     def tokenize(self, text: str) -> cohere.tokenize.Tokens:
-        return self.co.tokenize(text=text)
+        return self.client.tokenize(text=text)
