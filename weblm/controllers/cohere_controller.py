@@ -34,6 +34,10 @@ def make_fn(generate_func, tokenize_func, model):
     return func
 
 
+def _generate_func(co_client):
+    return co_client.generate
+
+
 class CohereController(Controller):
     MODEL = "xlarge"
     cohere_client = None
@@ -48,7 +52,7 @@ class CohereController(Controller):
         if CohereController.cohere_client is None:
             CohereController.cohere_client = co
 
-        self._fn = make_fn(self.generate, self.tokenize, self.MODEL)
+        self._fn = make_fn(generate_func=_generate_func(self.co), tokenize_func=self.tokenize, model=self.MODEL)
 
     def embed(self, texts: List[str], truncate: str = "RIGHT") -> cohere.embeddings.Embeddings:
         return self.co.embed(texts=texts, truncate=truncate)
@@ -64,7 +68,7 @@ class CohereController(Controller):
         return_likelihoods: str = "GENERATION",
     ) -> cohere.generation.Generations:
 
-        return self.co.generate(
+        return _generate_func(self.co)(
             prompt=prompt,
             model=model if model else self.MODEL,
             temperature=temperature,
