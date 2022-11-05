@@ -40,7 +40,7 @@ def _generate_func(co_client):
 
 class CohereController(Controller):
     MODEL = "xlarge"
-    cohere_client = None
+    cohere_client = None  # possible to get client without instantiating controller
 
     Controller.client_exception = cohere.error.CohereError
     Controller.client_exception_message = "Cohere fucked up: {0}"
