@@ -527,49 +527,33 @@ class Controller:
     ) -> Union[Command, Prompt]:
         """Handle the feedback from the user on the generated command"""
 
-        def _examples_handler():
-            examples = "\n".join(examples)
-            return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 'n'")
-
-        def _prompt_handler():
-            chosen_element = self._chosen_elements[0]["id"]
-            state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
-            return Prompt(f"{prompt}\n\nPlease respond with 'y' or 's'")
-
-        def _recrawl_handler():
-            return Prompt(eval(f'f"""{user_prompt_3}"""'))
-
-        def _elements_handler():
-            return Prompt("\n".join(str(d) for d in self._chosen_elements))
-
-        def _search_match_handler():
-            query = re.match(r"search (.+)", response).group(1)
-            # results = self.search(query, self._page_elements, topk=50)
-            results = self.search(query=query, items=self._page_elements, topk=50)
-            return Prompt(f"Query: {query}\nResults:\n{results}\n\n" "Please respond with 'y' or 'n'")
-
-        _feedback_handler = {
-            "examples": _examples_handler,
-            "prompt": _prompt_handler,
-            "recrawl": _recrawl_handler,
-            "elements": _elements_handler,
-        }
-
-        if response in _feedback_handler:
-            return _feedback_handler[response]()
-        elif re.match(r"search (.+)", response):
-            return _search_match_handler()
-
-        # not sure if this can be moved to handler as the 'type' might not be in self._action
-        if re.match(r"\d+", response):
-            # this is if the user picks a different element from the list
-            chosen_element = self._chosen_elements[int(response) - 1]["id"]
-            state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
-            self._cmd = self._get_cmd_prediction(prompt, chosen_element)
-            if "type" in self._action:
+        match response:
+            case "examples":
+                examples = "\n".join(examples)
+                return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 'n'")
+            case "prompt":
+                chosen_element = self._chosen_elements[0]["id"]
+                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+                return Prompt(f"{prompt}\n\nPlease respond with 'y' or 's'")
+            case "recrawl":
                 return Prompt(eval(f'f"""{user_prompt_3}"""'))
-        elif response != "y" and response != "s":
-            self._cmd = response
+            case "elements":
+                return Prompt("\n".join(str(d) for d in self._chosen_elements))
+            case _:
+                if re.match(r"search (.+)", response):
+                    query = re.match(r"search (.+)", response).group(1)
+                    # results = self.search(query, self._page_elements, topk=50)
+                    results = self.search(query=query, items=self._page_elements, topk=50)
+                    return Prompt(f"Query: {query}\nResults:\n{results}\n\n" "Please respond with 'y' or 'n'")
+                elif re.match(r"\d+", response):
+                    chosen_element = self._chosen_elements[int(response) - 1]["id"]
+                    state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+                    self._cmd = self._get_cmd_prediction(prompt, chosen_element)
+                    if "type" in self._action:
+                        return Prompt(eval(f'f"""{user_prompt_3}"""'))
+                elif response not in ["y", "s"]:
+                    self._cmd = response
+
 
         cmd_pattern = r"(click|type) (link|button|input|select) [\d]+( \"\w+\")?"
         other_cmds_pattern = r"(summary)( \"\w+\")?"  # probably want more diverse way to do this, e.g. summarize/summary/etc
@@ -617,11 +601,14 @@ class Controller:
 
         if isinstance(action_or_prompt, Prompt):
             return action_or_prompt
-        if "click" in self._action:
-            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE), self._pruned_prioritized_elements))
-        elif "type" in self._action:
-            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._pruned_prioritized_elements))
-        elif "summary" in self._action:
-            pruned_elements = ["summary of text on page"]
+
+        match self._action.strip():
+            case "click":
+                pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE), self._pruned_prioritized_elements))
+            case "type":
+                pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._pruned_prioritized_elements))
+            case "summary":
+                pruned_elements = ["summary of text on page"]
+
 
         return self.generate_command(url, pruned_elements, response)
