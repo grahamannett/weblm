@@ -15,6 +15,9 @@ import numpy as np
 
 from .stubs import *
 
+TYPEABLE = ["input", "select"]
+CLICKABLE = ["link", "button"]
+
 
 def truncate_left(tokenize: Callable, prompt: str, *rest_of_prompt, limit: int = 2048):
     i = 0
@@ -34,7 +37,7 @@ class Prompt:
         return self.prompt
 
     def __repr__(self) -> str:
-        return f"Prompt={self.__str__()}"
+        return f"Prompt=>{self.__str__()}"
 
 
 class Command:
@@ -45,7 +48,7 @@ class Command:
         return self.cmd
 
     def __repr__(self) -> str:
-        return f"Command={self.__str__()}"
+        return f"Command=>{self.__str__()}"
 
 
 class DialogueState(Enum):
@@ -102,12 +105,11 @@ class Controller:
 
     MAX_SEQ_LEN = 2000
     MAX_NUM_ELEMENTS = 50
-    TYPEABLE = ["input", "select"]
-    CLICKABLE = ["link", "button"]
+
     client_exception = None
     client_exception_message = "Base Exception Message: {0}"
 
-    def __init__(self, objective: str):
+    def __init__(self, objective: str, enable_threadpool: bool = True):
         """
         Args:
             co (cohere.Client): a Cohere Client
@@ -118,6 +120,7 @@ class Controller:
         self.previous_commands: List[str] = []
         self.moments: List[Tuple[str, str, str]] = []
         self.user_responses: DefaultDict[str, int] = defaultdict(int)
+        self.enable_threadpool = enable_threadpool
 
         self.reset_state()
 
@@ -168,12 +171,17 @@ class Controller:
         Returns:
             str: the most likely option from `options`
         """
-        num_options = min(len(options), 32)
-        with ThreadPoolExecutor(num_options) as pp:
-            _lh = pp.map(
-                func,
-                zip(options, [template.format(**option) for option in options], [self] * num_options, [return_likelihoods] * num_options),
-            )
+        num_options = min(len(options), 64)
+        zipped_args = list(
+            zip(options, [template.format(**option) for option in options], [self] * num_options, [return_likelihoods] * num_options)
+        )
+
+        if self.enable_threadpool:
+            with ThreadPoolExecutor(num_options) as thread_pool:
+                _lh = thread_pool.map(func, zipped_args)
+
+        else:
+            _lh = [func(arg) for arg in zipped_args]
         return sorted(_lh, key=lambda x: x[0], reverse=True)[:topk]
 
     def choose_element(self, template: str, options: List[Dict[str, str]], group_size: int = 10, topk: int = 1) -> List[Dict[str, str]]:
@@ -361,11 +369,8 @@ class Controller:
 
         if self._step == DialogueState.Action:
             action = " click"
-            if any(y in x for y in self.TYPEABLE for x in page_elements):
-                elements = list(
-                    filter(lambda x: any(x.startswith(y) for y in self.CLICKABLE + self.TYPEABLE), self._pruned_prioritized_elements)
-                )
-
+            if any(y in x for y in TYPEABLE for x in page_elements):
+                elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE + TYPEABLE), self._pruned_prioritized_elements))
                 state, prompt = self._shorten_prompt(url, elements, examples, target=self.MAX_SEQ_LEN)
 
                 action = self.choose(
@@ -483,81 +488,100 @@ class Controller:
 
         return response
 
+    def generate_command_choose_element(
+        self, url: str, pruned_elements: List[str], state: str, examples: np.ndarray, prompt: str
+    ) -> Prompt:
+        if len(pruned_elements) == 1:
+            chosen_element = " " + " ".join(pruned_elements[0].split(" ")[:2])
+            self._chosen_elements = [{"id": chosen_element}]
+        else:
+            state = self._construct_state(url, ["$elements"])
+            prompt = self._construct_prompt(state, examples)
+
+            state, prompt = self._shorten_prompt(url, ["$elements"], examples, self._action)
+
+            group_size = 20
+            self._chosen_elements = self.choose_element(
+                prompt + self._action + "{id}",
+                list(map(lambda x: {"id": " " + " ".join(x.split(" ")[:2]), "elements": x}, pruned_elements)),
+                group_size,
+                topk=5,
+            )
+            chosen_element = self._chosen_elements[0]["id"]
+
+            state = self._construct_state(url, pruned_elements)
+            prompt = self._construct_prompt(state, examples)
+
+            state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+
+        cmd = self._get_cmd_prediction(prompt, chosen_element)
+
+        self._cmd = cmd
+        self._step = DialogueState.CommandFeedback
+        other_options = "\n".join(f"\t({i+2}){self._action}{x['id']}" for i, x in enumerate(self._chosen_elements[1:]))
+        return Prompt(eval(f'f"""{user_prompt_2}"""'))
+
+    def generate_command_feedback_handler(
+        self, url: str, pruned_elements: List[str], response: str, examples: np.ndarray, prompt: str
+    ) -> Union[Command, Prompt]:
+        if response == "examples":
+            examples = "\n".join(examples)
+            return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 's'")
+        elif response == "prompt":
+            chosen_element = self._chosen_elements[0]["id"]
+            state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+            return Prompt(f"{prompt}\n\nPlease respond with 'y' or 's'")
+        elif response == "recrawl":
+            return Prompt(eval(f'f"""{user_prompt_3}"""'))
+        elif response == "elements":
+            return Prompt("\n".join(str(d) for d in self._chosen_elements))
+        elif re.match(r"search (.+)", response):
+            query = re.match(r"search (.+)", response).group(1)
+            # results = self.search(query, self._page_elements, topk=50)
+            results = self.search(query=query, items=self._page_elements, topk=50)
+            return Prompt(f"Query: {query}\nResults:\n{results}\n\n" "Please respond with 'y' or 'n'")
+
+        if re.match(r"\d+", response):
+            chosen_element = self._chosen_elements[int(response) - 1]["id"]
+            state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
+            self._cmd = self._get_cmd_prediction(prompt, chosen_element)
+            if "type" in self._action:
+                return Prompt(eval(f'f"""{user_prompt_3}"""'))
+        elif response != "y" and response != "s":
+            self._cmd = response
+
+        cmd_pattern = r"(click|type) (link|button|input|select) [\d]+( \"\w+\")?"
+        other_cmds_pattern = r"(summary)( \"\w+\")?"  # probably want more diverse way to do this, e.g. summarize/summary/etc
+
+        if not re.match(cmd_pattern, self._cmd) and not re.match(other_cmds_pattern, self._cmd):
+            return Prompt(f"Invalid command '{self._cmd}'. Must match regex '{cmd_pattern}'. Try again...")
+
+        if response == "s":
+            self._save_example(url=url, elements=self._prioritized_elements, command=self._cmd)
+
+        return Command(self._cmd.strip())
+
     def generate_command(self, url: str, pruned_elements: List[str], response: str = None):
         state = self._construct_state(url, pruned_elements)
         examples = self.gather_examples(state)
         prompt = self._construct_prompt(state, examples)
 
         if self._step == DialogueState.Command:
-            if len(pruned_elements) == 1:
-                chosen_element = " " + " ".join(pruned_elements[0].split(" ")[:2])
-                self._chosen_elements = [{"id": chosen_element}]
-            else:
-                state = self._construct_state(url, ["$elements"])
-                prompt = self._construct_prompt(state, examples)
+            return self.generate_command_choose_element(
+                url=url, pruned_elements=pruned_elements, state=state, examples=examples, prompt=prompt
+            )
 
-                state, prompt = self._shorten_prompt(url, ["$elements"], examples, self._action)
-
-                group_size = 20
-                self._chosen_elements = self.choose_element(
-                    prompt + self._action + "{id}",
-                    list(map(lambda x: {"id": " " + " ".join(x.split(" ")[:2]), "elements": x}, pruned_elements)),
-                    group_size,
-                    topk=5,
-                )
-                chosen_element = self._chosen_elements[0]["id"]
-
-                state = self._construct_state(url, pruned_elements)
-                prompt = self._construct_prompt(state, examples)
-
-                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
-
-            cmd = self._get_cmd_prediction(prompt, chosen_element)
-
-            self._cmd = cmd
-            self._step = DialogueState.CommandFeedback
-            other_options = "\n".join(f"\t({i+2}){self._action}{x['id']}" for i, x in enumerate(self._chosen_elements[1:]))
-            return Prompt(eval(f'f"""{user_prompt_2}"""'))
         elif self._step == DialogueState.CommandFeedback:
-            if response == "examples":
-                examples = "\n".join(examples)
-                return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 's'")
-            elif response == "prompt":
-                chosen_element = self._chosen_elements[0]["id"]
-                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
-                return Prompt(f"{prompt}\n\nPlease respond with 'y' or 's'")
-            elif response == "recrawl":
-                return Prompt(eval(f'f"""{user_prompt_3}"""'))
-            elif response == "elements":
-                return Prompt("\n".join(str(d) for d in self._chosen_elements))
-            elif re.match(r"search (.+)", response):
-                query = re.match(r"search (.+)", response).group(1)
-                # results = self.search(query, self._page_elements, topk=50)
-                results = self.search(query=query, items=self._page_elements, topk=50)
-                return Prompt(f"Query: {query}\nResults:\n{results}\n\n" "Please respond with 'y' or 'n'")
-
-            if re.match(r"\d+", response):
-                chosen_element = self._chosen_elements[int(response) - 1]["id"]
-                state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
-                self._cmd = self._get_cmd_prediction(prompt, chosen_element)
-                if "type" in self._action:
-                    return Prompt(eval(f'f"""{user_prompt_3}"""'))
-            elif response != "y" and response != "s":
-                self._cmd = response
-
-            cmd_pattern = r"(click|type) (link|button|input|select) [\d]+( \"\w+\")?"
-            other_cmds_pattern = r"(summary)( \"\w+\")?"  # probably want more diverse way to do this, e.g. summarize/summary/etc
-
-            if not re.match(cmd_pattern, self._cmd) and not re.match(other_cmds_pattern, self._cmd):
-                return Prompt(f"Invalid command '{self._cmd}'. Must match regex '{cmd_pattern}'. Try again...")
-
-            if response == "s":
-                self._save_example(url=url, elements=self._prioritized_elements, command=self._cmd)
+            if type(cmd := self.generate_command_feedback_handler(url, pruned_elements, response, examples, prompt)) == Prompt:
+                return cmd
+        else:
+            print("error not a command or commandfeedback...")
+            breakpoint()
+            cmd = Command(self._cmd.strip())
 
         self.moments.append((url, self._prioritized_elements, self._cmd))
         self.previous_commands.append(self._cmd)
 
-        cmd = Command(self._cmd.strip())
         self.reset_state()
         return cmd
 
@@ -574,11 +598,10 @@ class Controller:
 
         if isinstance(action_or_prompt, Prompt):
             return action_or_prompt
-
         if "click" in self._action:
-            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in self.CLICKABLE), self._pruned_prioritized_elements))
+            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE), self._pruned_prioritized_elements))
         elif "type" in self._action:
-            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in self.TYPEABLE), self._pruned_prioritized_elements))
+            pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._pruned_prioritized_elements))
         elif "summary" in self._action:
             pruned_elements = ["summary of text on page"]
 

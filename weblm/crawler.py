@@ -468,20 +468,3 @@ class Crawler:
             self.type(id, text)
 
         time.sleep(2)
-
-
-# class Scroll:
-#     ACTION: str = "SCROLL"
-
-#     def __call__(self, direction: str , crawler: Crawler, **kwds):
-#         if
-#         matchc direction:
-#             case "down":
-#                 crawler.scroll("down")
-#             case "up":
-#                 crawler.scroll("up")
-
-
-# class RunCommands:
-#     scroll_up: Scroll()
-#     scroll_down: Scroll()
