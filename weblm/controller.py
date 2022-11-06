@@ -496,7 +496,6 @@ class Controller:
         state = self._construct_state(url, self._pruned_prioritized_elements)
         examples = self.gather_examples(state)
         prompt = self._construct_prompt(state, examples)
-
         if self._step == DialogueState.Action:
             action = " click"
             if any(y in x for y in TYPEABLE for x in page_elements):

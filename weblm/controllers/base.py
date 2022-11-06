@@ -1,6 +1,3 @@
-import cohere
-import csv
-import heapq
 import itertools
 import json
 import math
@@ -578,8 +575,7 @@ class Controller:
             if type(cmd := self.generate_command_feedback_handler(url, pruned_elements, examples, prompt, response)) == Prompt:
                 return cmd
         else:
-            print("error not a command or commandfeedback...")
-            breakpoint()
+            print("possible error not a command or commandfeedback...")
             cmd = Command(self._cmd.strip())
 
         self.moments.append((url, self._prioritized_elements, self._cmd))
