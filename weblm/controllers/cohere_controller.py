@@ -7,7 +7,13 @@ from .base import Controller, truncate_left
 
 
 def make_fn(generate_func, tokenize_func, model):
+    """helper to make func for threadpool"""
+
     def func(x):
+        """func that is actually called by threadpool
+
+        this takes a prompt and returns the likelihood of that prompt (hence max_tokens=0)
+        """
         if len(x) == 3:
             option, prompt, self = x
             return_likelihoods = "ALL"
@@ -18,12 +24,8 @@ def make_fn(generate_func, tokenize_func, model):
             try:
                 if len(tokenize_func(prompt)) > 2048:
                     prompt = truncate_left(tokenize_func, prompt)
-                return (
-                    generate_func(prompt=prompt, max_tokens=0, model=model, return_likelihoods=return_likelihoods)
-                    .generations[0]
-                    .likelihood,
-                    option,
-                )
+                response = generate_func(prompt=prompt, max_tokens=0, model=model, return_likelihoods=return_likelihoods)
+                return (response.generations[0].likelihood, option)
             except cohere.error.CohereError as e:
                 print(f"Cohere fucked up: {e}")
                 continue
@@ -46,13 +48,13 @@ class CohereController(Controller):
     Controller.client_exception_message = "Cohere fucked up: {0}"
 
     def __init__(self, co: cohere.Client, objective: str, **kwargs):
-        super().__init__(objective)
+        super().__init__(objective, **kwargs)
         self.client = co
 
         if CohereController.cohere_client is None:
             CohereController.cohere_client = co
 
-        self._fn = make_fn(generate_func=_generate_func(self.co), tokenize_func=self.tokenize, model=self.MODEL)
+        self._fn = make_fn(generate_func=_generate_func(self.client), tokenize_func=self.tokenize, model=self.MODEL)
 
     def embed(self, texts: List[str], truncate: str = "RIGHT") -> cohere.embeddings.Embeddings:
         return self.client.embed(texts=texts, truncate=truncate)
@@ -68,14 +70,14 @@ class CohereController(Controller):
         return_likelihoods: str = "GENERATION",
     ) -> cohere.generation.Generations:
 
-        return _generate_func(self.client)(
+        return self.client.generate(
             prompt=prompt,
             model=model if model else self.MODEL,
             temperature=temperature,
             num_generations=num_generations,
             max_tokens=max_tokens,
             stop_sequences=stop_sequences,
-            return_likelihoods="GENERATION",
+            return_likelihoods=return_likelihoods,
         )
 
     def tokenize(self, text: str) -> cohere.tokenize.Tokens:

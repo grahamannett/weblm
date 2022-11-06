@@ -19,7 +19,8 @@ from .crawler import URL_PATTERN, Crawler
 from .data_saver import CSVSaver as DataSaver
 
 co = cohere.Client(os.environ.get("COHERE_KEY"), check_api_key=False)
-keep_device_ratio = strtobool(os.environ.get("KEEP_DEVICE_RATIO", "False"))
+keep_device_ratio = bool(strtobool(os.environ.get("KEEP_DEVICE_RATIO", "False")))
+enable_threadpool = bool(strtobool(os.environ.get("ENABLE_TP", "True")))
 
 if __name__ == "__main__":
     data_saver = DataSaver()
@@ -39,7 +40,7 @@ if __name__ == "__main__":
         if len(i) > 0:
             objective = i
 
-        _controller = Controller(co, objective)
+        _controller = Controller(co, objective, enable_threadpool=enable_threadpool)
         return _crawler, _controller
 
     crawler, controller = reset()
@@ -47,6 +48,7 @@ if __name__ == "__main__":
     response = None
     content = []
     crawler.go_to_page("google.com")
+
     while True:
         if response == "cancel":
             data_saver.save_responses(controller.user_responses)
