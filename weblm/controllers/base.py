@@ -526,23 +526,41 @@ class Controller:
         self, url: str, pruned_elements: List[str], response: str, examples: np.ndarray, prompt: str
     ) -> Union[Command, Prompt]:
         """Handle the feedback from the user on the generated command"""
-        if response == "examples":
+
+        def _examples_handler():
             examples = "\n".join(examples)
-            return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 's'")
-        elif response == "prompt":
+            return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 'n'")
+        def _prompt_handler():
             chosen_element = self._chosen_elements[0]["id"]
             state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
             return Prompt(f"{prompt}\n\nPlease respond with 'y' or 's'")
-        elif response == "recrawl":
+
+        def _recrawl_handler():
             return Prompt(eval(f'f"""{user_prompt_3}"""'))
-        elif response == "elements":
+
+        def _elements_handler():
             return Prompt("\n".join(str(d) for d in self._chosen_elements))
-        elif re.match(r"search (.+)", response):
+
+        def _search_match_handler():
             query = re.match(r"search (.+)", response).group(1)
             # results = self.search(query, self._page_elements, topk=50)
             results = self.search(query=query, items=self._page_elements, topk=50)
             return Prompt(f"Query: {query}\nResults:\n{results}\n\n" "Please respond with 'y' or 'n'")
 
+        _feedback_handler = {
+            "examples": _examples_handler,
+            "prompt": _prompt_handler,
+            "recrawl": _recrawl_handler,
+            "elements": _elements_handler,
+        }
+
+        if response in _feedback_handler:
+            return _feedback_handler[response]()
+        elif re.match(r"search (.+)", response):
+            return _search_match_handler()
+
+
+        # not sure if this can be moved to handler as the 'type' might not be in self._action
         if re.match(r"\d+", response):
             # this is if the user picks a different element from the list
             chosen_element = self._chosen_elements[int(response) - 1]["id"]
