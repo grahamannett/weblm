@@ -489,9 +489,9 @@ class Controller:
         return response
 
     def generate_command_choose_element(
-        self, url: str, pruned_elements: List[str], state: str, examples: np.ndarray, prompt: str
+        self, url: str, pruned_elements: List[str], examples: np.ndarray, prompt: str, state: str
     ) -> Prompt:
-        """Generate a command by choosing an element from the prioritized list""""
+        """Generate a command by choosing an element from the prioritized list"""
         if len(pruned_elements) == 1:
             chosen_element = " " + " ".join(pruned_elements[0].split(" ")[:2])
             self._chosen_elements = [{"id": chosen_element}]
@@ -523,13 +523,14 @@ class Controller:
         return Prompt(eval(f'f"""{user_prompt_2}"""'))
 
     def generate_command_feedback_handler(
-        self, url: str, pruned_elements: List[str], response: str, examples: np.ndarray, prompt: str
+        self, url: str, pruned_elements: List[str], examples: np.ndarray, prompt: str, response: str
     ) -> Union[Command, Prompt]:
         """Handle the feedback from the user on the generated command"""
 
         def _examples_handler():
             examples = "\n".join(examples)
             return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 'n'")
+
         def _prompt_handler():
             chosen_element = self._chosen_elements[0]["id"]
             state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
@@ -559,7 +560,6 @@ class Controller:
         elif re.match(r"search (.+)", response):
             return _search_match_handler()
 
-
         # not sure if this can be moved to handler as the 'type' might not be in self._action
         if re.match(r"\d+", response):
             # this is if the user picks a different element from the list
@@ -588,12 +588,10 @@ class Controller:
         prompt = self._construct_prompt(state, examples)
 
         if self._step == DialogueState.Command:
-            return self.generate_command_choose_element(
-                url=url, pruned_elements=pruned_elements, state=state, examples=examples, prompt=prompt
-            )
+            return self.generate_command_choose_element(url, pruned_elements, examples, prompt, state)
 
         elif self._step == DialogueState.CommandFeedback:
-            if type(cmd := self.generate_command_feedback_handler(url, pruned_elements, response, examples, prompt)) == Prompt:
+            if type(cmd := self.generate_command_feedback_handler(url, pruned_elements, examples, prompt, response)) == Prompt:
                 return cmd
         else:
             print("error not a command or commandfeedback...")
