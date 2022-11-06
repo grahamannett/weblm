@@ -491,6 +491,7 @@ class Controller:
     def generate_command_choose_element(
         self, url: str, pruned_elements: List[str], state: str, examples: np.ndarray, prompt: str
     ) -> Prompt:
+        """Generate a command by choosing an element from the prioritized list""""
         if len(pruned_elements) == 1:
             chosen_element = " " + " ".join(pruned_elements[0].split(" ")[:2])
             self._chosen_elements = [{"id": chosen_element}]
@@ -524,6 +525,7 @@ class Controller:
     def generate_command_feedback_handler(
         self, url: str, pruned_elements: List[str], response: str, examples: np.ndarray, prompt: str
     ) -> Union[Command, Prompt]:
+        """Handle the feedback from the user on the generated command"""
         if response == "examples":
             examples = "\n".join(examples)
             return Prompt(f"Examples:\n{examples}\n\n" "Please respond with 'y' or 's'")
@@ -542,6 +544,7 @@ class Controller:
             return Prompt(f"Query: {query}\nResults:\n{results}\n\n" "Please respond with 'y' or 'n'")
 
         if re.match(r"\d+", response):
+            # this is if the user picks a different element from the list
             chosen_element = self._chosen_elements[int(response) - 1]["id"]
             state, prompt = self._shorten_prompt(url, pruned_elements, examples, self._action, chosen_element)
             self._cmd = self._get_cmd_prediction(prompt, chosen_element)
