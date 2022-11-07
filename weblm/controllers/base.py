@@ -169,9 +169,7 @@ class Controller:
             str: the most likely option from `options`
         """
         num_options = min(len(options), 64)
-        zipped_args = list(
-            zip(options, [template.format(**option) for option in options], [self] * num_options, [return_likelihoods] * num_options)
-        )
+        zipped_args = list(zip(options, [template.format(**option) for option in options], [return_likelihoods] * num_options))
 
         if self.enable_threadpool:
             with ThreadPoolExecutor(num_options) as thread_pool:
@@ -537,8 +535,8 @@ class Controller:
             case "elements":
                 return Prompt("\n".join(str(d) for d in self._chosen_elements))
             case _:
-                if re.match(r"search (.+)", response):
-                    query = re.match(r"search (.+)", response).group(1)
+                if search_match := re.match(r"search (.+)", response):
+                    query = search_match.group(1)
                     # results = self.search(query, self._page_elements, topk=50)
                     results = self.search(query=query, items=self._page_elements, topk=50)
                     return Prompt(f"Query: {query}\nResults:\n{results}\n\n" "Please respond with 'y' or 'n'")
@@ -550,7 +548,6 @@ class Controller:
                         return Prompt(eval(f'f"""{user_prompt_3}"""'))
                 elif response not in ["y", "s"]:
                     self._cmd = response
-
 
         cmd_pattern = r"(click|type) (link|button|input|select) [\d]+( \"\w+\")?"
         other_cmds_pattern = r"(summary)( \"\w+\")?"  # probably want more diverse way to do this, e.g. summarize/summary/etc
@@ -568,15 +565,12 @@ class Controller:
         examples = self.gather_examples(state)
         prompt = self._construct_prompt(state, examples)
 
-        if self._step == DialogueState.Command:
-            return self.generate_command_choose_element(url, pruned_elements, examples, prompt, state)
-
-        elif self._step == DialogueState.CommandFeedback:
-            if type(cmd := self.generate_command_feedback_handler(url, pruned_elements, examples, prompt, response)) == Prompt:
-                return cmd
-        else:
-            print("possible error not a command or commandfeedback...")
-            cmd = Command(self._cmd.strip())
+        match self._step:
+            case DialogueState.Command:
+                return self.generate_command_choose_element(url, pruned_elements, examples, prompt, state)
+            case DialogueState.CommandFeedback:
+                if type(cmd := self.generate_command_feedback_handler(url, pruned_elements, examples, prompt, response)) == Prompt:
+                    return cmd
 
         self.moments.append((url, self._prioritized_elements, self._cmd))
         self.previous_commands.append(self._cmd)
@@ -605,6 +599,5 @@ class Controller:
                 pruned_elements = list(filter(lambda x: any(x.startswith(y) for y in TYPEABLE), self._pruned_prioritized_elements))
             case "summary":
                 pruned_elements = ["summary of text on page"]
-
 
         return self.generate_command(url, pruned_elements, response)

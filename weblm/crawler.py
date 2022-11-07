@@ -135,7 +135,6 @@ class Crawler:
             if x_d or y_d:
                 self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
 
-            breakpoint()
             self.page.mouse.click(x - x_d, y - y_d)
         else:
             print("Could not find element")

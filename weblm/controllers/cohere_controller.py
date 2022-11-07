@@ -15,10 +15,10 @@ def make_fn(generate_func, tokenize_func, model):
         this takes a prompt and returns the likelihood of that prompt (hence max_tokens=0)
         """
         if len(x) == 3:
-            option, prompt, self = x
+            option, prompt = x
             return_likelihoods = "ALL"
         elif len(x) == 4:
-            option, prompt, self, return_likelihoods = x
+            option, prompt, return_likelihoods = x
 
         while True:
             try:
