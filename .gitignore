@@ -6,3 +6,5 @@ poetry.lock
 screenshot.png
 **/.DS_Store
 .envrc
+
+ignored_tests/
