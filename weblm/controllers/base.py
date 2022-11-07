@@ -571,6 +571,8 @@ class Controller:
             case DialogueState.CommandFeedback:
                 if type(cmd := self.generate_command_feedback_handler(url, pruned_elements, examples, prompt, response)) == Prompt:
                     return cmd
+            case _:
+                cmd = Command(self._cmd.strip())
 
         self.moments.append((url, self._prioritized_elements, self._cmd))
         self.previous_commands.append(self._cmd)
