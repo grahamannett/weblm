@@ -132,11 +132,15 @@ class Crawler:
             if x_d or y_d:
                 self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
 
+<<<<<<< HEAD
             if x_d or y_d:
                 # not entirely sure this will work if there is scrolling
                 self.page.mouse.click(x - x_d, y - y_d)
             else:
                 self.page.mouse.click(x + element["origin_x"], y + element["origin_y"])
+=======
+            self.page.mouse.click(x - x_d, y - y_d)
+>>>>>>> 5d98721 (dont need self on threaded func)
         else:
             print("Could not find element")
 
