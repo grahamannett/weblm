@@ -1,12 +1,8 @@
-import asyncio
 import json
 import re
 import time
-import uuid
-from dataclasses import dataclass, field
 from os.path import exists
 from sys import platform
-from typing import Any, List
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -42,45 +38,6 @@ def replace_special_fields(cmd):
             cmd = cmd.replace(k, v)
 
     return cmd
-
-@dataclass
-class Element:
-    node_index: str
-    backend_node_id: int
-    node_name: str
-    node_value: Any
-    is_clickable: bool
-
-    origin_x: int
-    origin_y: int
-    center_x: int
-    center_y: int
-
-    node_meta: List[str] = field(default_factory=list)
-
-
-
-
-
-
-
-class ElementCapture:
-    def __init__(self):
-        self.folder = "screenshots"
-
-    def capture(self, page: Page, element: Element):
-        screenshot = page.screenshot(clip={
-            "x": element.origin_x,
-            "y": element.origin_y,
-            "width": element.center_x,
-            "height": element.origin_y,
-        }, path=self.latest_file())
-        return screenshot
-
-
-    def latest_file(self):
-        return f"{self.folder}/{str(uuid.uuid4())}.png"
-
 
 
 class Crawler:
@@ -491,7 +448,6 @@ class Crawler:
             task_interface = TasksInterface()
             short_text_with_prompt = task_interface.summary(short_text)
             controller.use_text(short_text_with_prompt)
-
         elif cmd.startswith("click"):
             commasplit = cmd.split(",")
             id = commasplit[0].split(" ")[2]
@@ -506,4 +462,14 @@ class Crawler:
             text += "\n"
             self.type(id, text)
 
-        time.sleep(2)
+        time.sleep(1)
+
+
+class Scroller:
+    def __call__(self, direction: str):
+        return
+
+
+class CommandDispatch:
+    def __init__(self, crawler: Crawler) -> None:
+        self.crawler = crawler
