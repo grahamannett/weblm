@@ -9,3 +9,4 @@ screenshot.png
 
 ignored_tests/
 tests/screenshots/
+db/
