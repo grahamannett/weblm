@@ -6,6 +6,8 @@ class ScreenshotGrabber:
         self.curr_idx = 0
         self.screenshot_dir = screenshot_dir
 
-    def __call__(self, state: WebLMState):
-        screenshot = state.crawler.page.screenshot(path=f"{self.screenshot_dir}/{self.curr_idx}.png")
+    def __call__(self, state: WebLMState, path: str = None):
+        path = f"{self.screenshot_dir}/{self.curr_idx}.png" if path is None else path
+        screenshot = state.crawler.page.screenshot(path=path)
         self.curr_idx += 1
+        return path

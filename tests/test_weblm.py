@@ -33,7 +33,17 @@ class input_test:
         self.mock.stop()
 
 
+class ScreenshotOnFail:
+    def __init__(self):
+        self.screenshot_grabber = ScreenshotGrabber()
+
+    def __call__(self, state):
+        return self.screenshot_grabber(state)
+
+
 class TestCase(unittest.TestCase):
+    # failureException = ScreenshotOnFail(unittest.TestCase.failureException)
+
     def setUp(self) -> None:
         return super().setUp()
 
@@ -51,8 +61,7 @@ class TestCase(unittest.TestCase):
         with input_test(commands.pop(0)):
             state = weblm.start(headless=True)
 
-        screenshot_grabber(state)
-        self.assertIsNone(state.response)
+        self.assertIsNone(state.response, msg=screenshot_grabber(state))
 
         cmd = commands.pop(0)
         with input_test(cmd) as input:

@@ -8,5 +8,6 @@ screenshot.png
 .envrc
 
 ignored_tests/
+tracing/
 tests/screenshots/
 db/

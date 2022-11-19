@@ -21,15 +21,8 @@ from .crawler import URL_PATTERN, Crawler
 from .data_saver import CSVSaver as DataSaver
 
 
-def print_help():
-    print(
-        "(g) to visit url\n(u) scroll up\n(d) scroll dow\n(c) to click\n(t) to type\n"
-        + "(h) to view commands again\n(r) to run suggested command\n(o) change objective"
-    )
-
-
 @dataclass
-class State:
+class WebLMState:
     crawler: Crawler
     controller: Controller
     response: Union[Prompt, Command, str]
@@ -42,34 +35,32 @@ class WebLM:
         self.keep_device_ratio = bool(strtobool(os.environ.get("KEEP_DEVICE_RATIO", "False")))
         self.enable_threadpool = bool(strtobool(os.environ.get("ENABLE_TP", "True")))
         self.data_saver = DataSaver()
+        self.continue_threshold = 1 / 3
 
     def get_input(self):
-        objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
-        print("\nWelcome to WebLM! What is your objective?")
-        i = input()
-        objective = i
-        return objective
+        # helper function that can be wrapped in a mock to test input
+        return input()
 
-    def reset(self):
-        crawler = Crawler(keep_device_ratio=self.keep_device_ratio)
+    def reset(self, headless: bool = False):
+        crawler = Crawler(keep_device_ratio=self.keep_device_ratio, headless=headless)
 
         objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
         print("\nWelcome to WebLM! What is your objective?")
-        i = input()
+        i = self.get_input()
         if len(i) > 0:
             objective = i
 
         controller = Controller(self.client, objective, enable_threadpool=self.enable_threadpool)
         return crawler, controller
 
-    def start(self):
-        crawler, controller = self.reset()
+    def start(self, headless: bool = False):
+        crawler, controller = self.reset(headless=headless)
         response = None
         content = []
         crawler.go_to_page("google.com")
-        return State(crawler, controller, response, content)
+        return WebLMState(crawler, controller, response, content)
 
-    def run(self, state: State = None):
+    def step(self, state: WebLMState = None):
 
         crawler, controller, response, content = state.crawler, state.controller, state.response, state.content
         if response == "cancel":
@@ -100,13 +91,18 @@ class WebLM:
             crawler.run_cmd(str(response), controller=controller)
             response = None
         elif isinstance(response, Prompt):
-            response = input(str(response))
+            if response.likelihood > self.continue_threshold:
+                print(response)
+                response = self.get_input()
+            else:
+                print("continuing with current thing...")
+                response = "y"
 
-        return State(crawler, controller, response, content)
+        return WebLMState(crawler, controller, response, content)
 
 
 if __name__ == "__main__":
     weblm = WebLM()
     state = weblm.start()
     while True:
-        state = weblm.run(state)
+        state = weblm.step(state)
