@@ -27,8 +27,9 @@ def truncate_left(tokenize: Callable, prompt: str, *rest_of_prompt, limit: int =
 
 
 class Prompt:
-    def __init__(self, prompt: str) -> None:
+    def __init__(self, prompt: str, likelihood: float = 0.0) -> None:
         self.prompt = prompt
+        self.likelihood = likelihood
 
     def __str__(self) -> str:
         return self.prompt
@@ -38,8 +39,9 @@ class Prompt:
 
 
 class Command:
-    def __init__(self, cmd: str) -> None:
+    def __init__(self, cmd: str, likelihood: float = None) -> None:
         self.cmd = cmd
+        self.likelihood = likelihood
 
     def __str__(self) -> str:
         return self.cmd
@@ -368,10 +370,10 @@ class Controller:
                 elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE + TYPEABLE), self._pruned_prioritized_elements))
                 state, prompt = self._shorten_prompt(url, elements, examples, target=self.MAX_SEQ_LEN)
 
-                action = self.choose(
-                    self._fn,
-                    prompt + "{action}",
-                    [
+                actions = self.choose(
+                    func=self._fn,
+                    template=prompt + "{action}",
+                    options=[
                         {
                             "action": " click",
                         },
@@ -386,13 +388,15 @@ class Controller:
                 )
 
                 # if the model is confident enough, just assume the suggested action is correct
-                if (action[0][0] - action[1][0]) / -action[1][0] > 1.0:
+                if (actions[0][0] - actions[1][0]) / -actions[1][0] > 1.0:
                     action = action[0][1]["action"]
                 else:
-                    action = action[0][1]["action"]
+                    action = actions[0][1]["action"]
+                    likelihood = [math.exp(a[0]) for a in actions]
+                    likelihood = likelihood[0] / sum(likelihood)
                     self._action = action
                     self._step = DialogueState.ActionFeedback
-                    return Prompt(eval(f'f"""{user_prompt_1}"""'))
+                    return Prompt(eval(f'f"""{user_prompt_1}"""'), likelihood=likelihood)
 
             self._action = action
             self._step = DialogueState.Command

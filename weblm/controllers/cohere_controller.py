@@ -1,4 +1,4 @@
-from typing import List
+from typing import Callable, List
 
 import cohere
 from requests.exceptions import ConnectionError
@@ -9,7 +9,7 @@ from .base import Controller, truncate_left
 def make_fn(generate_func, tokenize_func, model):
     """helper to make func for threadpool"""
 
-    def func(x):
+    def _fn(x):
         """func that is actually called by threadpool
 
         this takes a prompt and returns the likelihood of that prompt (hence max_tokens=0)
@@ -20,6 +20,7 @@ def make_fn(generate_func, tokenize_func, model):
         elif len(x) == 3:
             option, prompt, return_likelihoods = x
 
+        prompt = prompt.replace("&", "AND")  # remove this later, cohere backend bug
         while True:
             try:
                 if len(tokenize_func(prompt)) > 2048:
@@ -33,11 +34,22 @@ def make_fn(generate_func, tokenize_func, model):
                 print(f"Connection error: {e}")
                 continue
 
-    return func
+    return _fn
 
 
-def _generate_func(co_client):
+def _generate_func(co_client: cohere.Client) -> Callable:
     return co_client.generate
+    # def _fn(prompt: str, **kwargs):
+    #     return co_client.generate(prompt=prompt, **kwargs)
+    # return _fn
+
+
+def _tokenize_func(co_client: cohere.Client) -> Callable:
+    return co_client.tokenize
+    # def _fn(text: str, **kwargs):
+    #     return co_client.tokenize(text=text, **kwargs)
+
+    # return _fn
 
 
 class CohereController(Controller):
@@ -54,7 +66,8 @@ class CohereController(Controller):
         if CohereController.cohere_client is None:
             CohereController.cohere_client = co
 
-        self._fn = make_fn(generate_func=_generate_func(self.client), tokenize_func=self.tokenize, model=self.MODEL)
+        # self._fn = make_fn(generate_func=_generate_func(self.client), tokenize_func=self.tokenize, model=self.MODEL)
+        self._fn = make_fn(generate_func=self.generate, tokenize_func=self.tokenize, model=self.MODEL)
 
     def embed(self, texts: List[str], truncate: str = "RIGHT") -> cohere.embeddings.Embeddings:
         return self.client.embed(texts=texts, truncate=truncate)
@@ -68,8 +81,9 @@ class CohereController(Controller):
         max_tokens: int = 20,
         stop_sequences: List[str] = ["\n"],
         return_likelihoods: str = "GENERATION",
+        **kwargs,
     ) -> cohere.generation.Generations:
-
+        prompt = prompt.replace("&", "AND")  # remove this later, cohere backend bug
         return self.client.generate(
             prompt=prompt,
             model=model if model else self.MODEL,
@@ -78,7 +92,9 @@ class CohereController(Controller):
             max_tokens=max_tokens,
             stop_sequences=stop_sequences,
             return_likelihoods=return_likelihoods,
+            **kwargs,
         )
 
     def tokenize(self, text: str) -> cohere.tokenize.Tokens:
+        text = text.replace("&", "AND")  # remove this later, cohere backend bug
         return self.client.tokenize(text=text)
