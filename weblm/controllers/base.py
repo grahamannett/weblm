@@ -343,6 +343,11 @@ class Controller:
         return state, prompt
 
     def _generate_prioritization(self, page_elements: List[str], url: str):
+        if len(page_elements) < self.MAX_NUM_ELEMENTS:
+            self._prioritized_elements = page_elements
+            self._pruned_prioritized_elements = page_elements
+            self._step
+
         prioritization = prioritization_template
         prioritization = prioritization.replace("$objective", self.objective)
         prioritization = prioritization.replace("$url", url)

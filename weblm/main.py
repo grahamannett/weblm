@@ -10,8 +10,7 @@ import os
 import re
 import time
 from distutils.util import strtobool
-from multiprocessing import Pool
-from typing import Any, List, Union
+from typing import List, Union
 
 import cohere
 
@@ -23,10 +22,10 @@ from .data_saver import CSVSaver as DataSaver
 
 @dataclass
 class WebLMState:
-    crawler: Crawler
-    controller: Controller
-    response: Union[Prompt, Command, str]
-    content: List[str]
+    crawler: Crawler = None
+    controller: Controller = None
+    response: Union[Prompt, Command, str] = None
+    content: List[str] = None
 
 
 class WebLM:
@@ -41,7 +40,7 @@ class WebLM:
         # helper function that can be wrapped in a mock to test input
         return input()
 
-    def reset(self, headless: bool = False):
+    def reset(self, headless: bool = False) -> WebLMState:
         crawler = Crawler(keep_device_ratio=self.keep_device_ratio, headless=headless)
 
         objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
@@ -51,21 +50,23 @@ class WebLM:
             objective = i
 
         controller = Controller(self.client, objective, enable_threadpool=self.enable_threadpool)
-        return crawler, controller
+        return WebLMState(crawler, controller)
 
-    def start(self, headless: bool = False):
-        crawler, controller = self.reset(headless=headless)
+    def start(self, headless: bool = False) -> WebLMState:
+        state = self.reset(headless=headless)
+        crawler, controller = state.crawler, state.controller
         response = None
         content = []
         crawler.go_to_page("google.com")
         return WebLMState(crawler, controller, response, content)
 
-    def step(self, state: WebLMState = None):
+    def step(self, state: WebLMState = None) -> WebLMState:
 
         crawler, controller, response, content = state.crawler, state.controller, state.response, state.content
         if response == "cancel":
             self.data_saver.save_responses(controller.user_responses)
-            crawler, controller = self.reset()
+            state = self.reset()
+            crawler, controller = state.crawler, state.controller
         elif response == "success":
             controller.success()
             self.data_saver.save_responses(controller.user_responses)
@@ -91,7 +92,7 @@ class WebLM:
             crawler.run_cmd(str(response), controller=controller)
             response = None
         elif isinstance(response, Prompt):
-            if response.likelihood > self.continue_threshold:
+            if response.likelihood < self.continue_threshold:
                 print(response)
                 response = self.get_input()
             else:

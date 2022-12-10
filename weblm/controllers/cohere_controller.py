@@ -20,7 +20,6 @@ def make_fn(generate_func, tokenize_func, model):
         elif len(x) == 3:
             option, prompt, return_likelihoods = x
 
-        prompt = prompt.replace("&", "AND")  # remove this later, cohere backend bug
         while True:
             try:
                 if len(tokenize_func(prompt)) > 2048:
@@ -83,7 +82,6 @@ class CohereController(Controller):
         return_likelihoods: str = "GENERATION",
         **kwargs,
     ) -> cohere.generation.Generations:
-        prompt = prompt.replace("&", "AND")  # remove this later, cohere backend bug
         return self.client.generate(
             prompt=prompt,
             model=model if model else self.MODEL,
@@ -96,5 +94,4 @@ class CohereController(Controller):
         )
 
     def tokenize(self, text: str) -> cohere.tokenize.Tokens:
-        text = text.replace("&", "AND")  # remove this later, cohere backend bug
         return self.client.tokenize(text=text)
