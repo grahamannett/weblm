@@ -92,7 +92,11 @@ class Crawler:
             if x_d or y_d:
                 self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
 
-            self.page.mouse.click(x - x_d, y - y_d)
+            if x_d or y_d:
+                # not entirely sure this will work if there is scrolling
+                self.page.mouse.click(x - x_d, y - y_d)
+            else:
+                self.page.mouse.click(x + element["origin_x"], y + element["origin_y"])
         else:
             print("Could not find element")
 
