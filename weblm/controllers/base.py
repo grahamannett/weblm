@@ -6,11 +6,11 @@ import re
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
-from typing import Any, Callable, DefaultDict, Dict, List, Tuple, Union
+from typing import Any, Callable, DefaultDict, Dict, List, Sequence, Tuple, Union
 
 import numpy as np
 
-from .stubs import *
+from weblm.controllers.stubs import *
 
 TYPEABLE = ["input", "select"]
 CLICKABLE = ["link", "button"]
@@ -27,9 +27,10 @@ def truncate_left(tokenize: Callable, prompt: str, *rest_of_prompt, limit: int =
 
 
 class Prompt:
-    def __init__(self, prompt: str, likelihood: float = 0.0) -> None:
+    def __init__(self, prompt: str, likelihood: float = 0.0, metadata: dict = None) -> None:
         self.prompt = prompt
         self.likelihood = likelihood
+        self.metadata = metadata
 
     def __str__(self) -> str:
         return self.prompt
@@ -39,9 +40,10 @@ class Prompt:
 
 
 class Command:
-    def __init__(self, cmd: str, likelihood: float = None) -> None:
+    def __init__(self, cmd: str, likelihood: float = None, metadata: dict = None) -> None:
         self.cmd = cmd
         self.likelihood = likelihood
+        self.metadata = metadata
 
     def __str__(self) -> str:
         return self.cmd
@@ -211,6 +213,7 @@ class Controller:
             options_tmp = [{"id": item["id"]} for item in group]
 
             choice = [x[1] for x in self.choose(self._fn, template_tmp, options_tmp, topk=topk)]
+
             chosen_elements = []
             for x in choice:
                 chosen_elements.append(list(filter(lambda y: y["id"] == x["id"], group))[0])
@@ -279,7 +282,10 @@ class Controller:
             json.dump(history, fd)
         os.replace("examples_tmp.json", "examples.json")
 
-    def _construct_responses(self):
+    def _construct_responses(self, response: str = None):
+        if response:
+            self.user_responses[response] += 1
+
         keys_to_save = ["y", "n", "s", "command", "success", "cancel"]
         responses_to_save = defaultdict(int)
         for key, value in self.user_responses.items():
@@ -291,7 +297,7 @@ class Controller:
         self.user_responses = responses_to_save
         print(f"Responses being saved:\n{dict(responses_to_save)}")
 
-    def _shorten_prompt(self, url, elements, examples, *rest_of_prompt, target: int = MAX_SEQ_LEN):
+    def _shorten_prompt(self, url: str, elements: Sequence[str], examples: np.ndarray, *rest_of_prompt, target: int = MAX_SEQ_LEN):
         state = self._construct_state(url, elements)
         prompt = self._construct_prompt(state, examples)
 
@@ -336,7 +342,7 @@ class Controller:
 
         state, prompt = _fn(i, j)
 
-        # last resort, start cutting off the bigging of the prompt
+        # last resort, start cutting off the beginning of the prompt
         if len(self.tokenize(text=prompt + "".join(rest_of_prompt))) > target:
             prompt = truncate_left(self.tokenize, prompt, *rest_of_prompt, limit=target)
 
@@ -359,18 +365,62 @@ class Controller:
         self._step = DialogueState.Action
         print(self._prioritized_elements)
 
-    def pick_action(self, url: str, page_elements: List[str], response: str = None):
-        # this strategy for action selection does not work very well, TODO improve this
+    def _parse_generation_to_action(self, generation: str):
+        """i think this will be very brittle and probably wont work but the idea would be to prompt a language model
+        with possible actions and then make that output useable by the browser.  so has to fall into a sort of grammer
+        that is like "click on the element with the text 'blah'" or "type input 10 'item wanted'"
+
+        Args:
+            generation (str): _description_
+        """
+
+        generation_cleaned = [g for g in generation.split("\n") if len(g) > 0][0]
+        pass
+
+    def generate_pick_action(
+        self, url: str, page_elements: List[str], topk_examples: int = 1, temperature: float = 0.5, num_generations: int = 3
+    ):
+        state = self._construct_state(url, page_elements)
+        examples = self.gather_examples(state, topk=topk_examples)
+        prompt = self._construct_prompt(state, examples)
+
+        elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE + TYPEABLE), page_elements))
+
+        state, prompt = self._shorten_prompt(url, elements, examples, target=self.MAX_SEQ_LEN)
+
+        generations = self.generate(
+            prompt=prompt,
+            model=self.MODEL,
+            temperature=temperature,
+            num_generations=num_generations,
+            max_tokens=20,
+            return_likelihoods="GENERATION",
+            stop_sequences=["----"],  # i think the differentiator between stop sequences should be changed
+        ).generations
+        breakpoint()
+
+        return generations
+
+    def pick_action(self, url: str, page_elements: List[str], response: str = None, topk_examples: int = 5):
+        """
+        this strategy for action selection does not work very well, TODO improve this
+
+        for a given page, we should have all the page elements and then be able to pick one of the action options such as click, type, etc.
+        This does not select the actual element to click on, but rather just the general action
+        """
 
         if self._step not in [DialogueState.Action, DialogueState.ActionFeedback]:
             return
 
         state = self._construct_state(url, self._pruned_prioritized_elements)
-        examples = self.gather_examples(state)
+        examples = self.gather_examples(state, topk=topk_examples)
         prompt = self._construct_prompt(state, examples)
 
         if self._step == DialogueState.Action:
+
+            # start with default action of "click" unless we want to choose something else
             action = " click"
+            # if any of the page elements have "input" or "select" in them, enter this
             if any(y in x for y in TYPEABLE for x in page_elements):
                 elements = list(filter(lambda x: any(x.startswith(y) for y in CLICKABLE + TYPEABLE), self._pruned_prioritized_elements))
                 state, prompt = self._shorten_prompt(url, elements, examples, target=self.MAX_SEQ_LEN)
@@ -397,14 +447,16 @@ class Controller:
                     action = action[0][1]["action"]
                 else:
                     action = actions[0][1]["action"]
-                    likelihood = [math.exp(a[0]) for a in actions]
-                    likelihood = likelihood[0] / sum(likelihood)
+                    likelihoods = [math.exp(a[0]) for a in actions]
+                    likelihood = likelihoods[0] / sum(likelihoods)
                     self._action = action
                     self._step = DialogueState.ActionFeedback
-                    return Prompt(eval(f'f"""{user_prompt_1}"""'), likelihood=likelihood)
+                    return Prompt(
+                        eval(f'f"""{user_prompt_1}"""'),
+                        likelihood=likelihood,
+                        metadata={"from": "user_prompt_1", "action": action},
+                    )
 
-            self._action = action
-            self._step = DialogueState.Command
         elif self._step == DialogueState.ActionFeedback:
             if response == "y":
                 pass
@@ -423,7 +475,8 @@ class Controller:
             else:
                 return Prompt("Please respond with 'y' or 'n'")
 
-            self._step = DialogueState.Command
+        self._action = action
+        self._step = DialogueState.Command
 
     def _get_cmd_prediction(self, prompt: str, chosen_element: str) -> str:
         if "type" in self._action:
@@ -499,6 +552,7 @@ class Controller:
         if len(pruned_elements) == 1:
             chosen_element = " " + " ".join(pruned_elements[0].split(" ")[:2])
             self._chosen_elements = [{"id": chosen_element}]
+            likelihood = 1.0
         else:
             state = self._construct_state(url, ["$elements"])
             prompt = self._construct_prompt(state, examples)
@@ -513,6 +567,7 @@ class Controller:
                 topk=5,
             )
             chosen_element = self._chosen_elements[0]["id"]
+            likelihood = self._chosen_elements[0]["likelihood"]
 
             state = self._construct_state(url, pruned_elements)
             prompt = self._construct_prompt(state, examples)
@@ -524,7 +579,7 @@ class Controller:
         self._cmd = cmd
         self._step = DialogueState.CommandFeedback
         other_options = "\n".join(f"\t({i+2}){self._action}{x['id']}" for i, x in enumerate(self._chosen_elements[1:]))
-        return Prompt(eval(f'f"""{user_prompt_2}"""'))
+        return Prompt(eval(f'f"""{user_prompt_2}"""'), likelihood=likelihood, metadata={"from": "user_prompt_2"})
 
     def generate_command_feedback_handler(
         self, url: str, pruned_elements: List[str], examples: np.ndarray, prompt: str, response: str
@@ -589,15 +644,14 @@ class Controller:
         self.reset_state()
         return cmd
 
-    def step(self, url: str, page_elements: List[str], response: str = None) -> Union[Prompt, Command]:
+    def step(self, url: str, page_elements: List[str], response: str = None, prev_state=None) -> Union[Prompt, Command]:
         self._step = DialogueState.Action if self._step == DialogueState.Unset else self._step
         self._page_elements = page_elements
 
         if self._prioritized_elements is None or self._prioritized_elements_hash != hash(frozenset(page_elements)):
             self._generate_prioritization(page_elements, url)
 
-        self.user_responses[response] += 1
-        self._construct_responses()
+        self._construct_responses(response=response)
         action_or_prompt = self.pick_action(url, page_elements, response)
 
         if isinstance(action_or_prompt, Prompt):

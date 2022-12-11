@@ -1,8 +1,10 @@
 # WebLM
 
-Drive a browser with Cohere
+Drive a browser with a LM:
+
 
 Derived from Nat's repo here: https://github.com/nat/natbot
+and https://github.com/aidangomez/weblm
 
 Features:
 - uses likelihoods instead of raw generations to guide the model's decision-making
@@ -19,5 +21,5 @@ Features:
 
 
 ## Files to add
-1. `specials.json` - You should store sensitive information like "Password": "password" to avoid saving it to `examples.json`. 
+1. `specials.json` - You should store sensitive information like "Password": "password" to avoid saving it to `examples.json`.
 

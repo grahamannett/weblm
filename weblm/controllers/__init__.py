@@ -1,3 +1,3 @@
 # this is default adapter/controller for time being
-from .cohere_controller import CohereController as Controller
-from .base import Command, Prompt
+from weblm.controllers.base import Command, Prompt, DialogueState
+from weblm.controllers.cohere_controller import CohereController as Controller

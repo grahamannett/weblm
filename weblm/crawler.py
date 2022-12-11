@@ -122,7 +122,6 @@ class Crawler:
         elements_of_interest = self._crawl(tree, win_upper_bound, win_width, win_left_bound, win_height, device_pixel_ratio)
 
         print("Parsing time: {:0.2f} seconds".format(time.time() - start))
-
         return elements_of_interest
 
     def _crawl(self, tree, win_upper_bound, win_width, win_left_bound, win_height, device_pixel_ratio):
