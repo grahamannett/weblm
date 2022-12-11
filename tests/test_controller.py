@@ -3,7 +3,7 @@ import os
 
 import cohere
 
-from weblm.controllers.base import DialogueState
+from weblm.controllers.controller import DialogueState
 from weblm.controllers import Controller
 
 objective = "buy bodywash"

@@ -26,30 +26,34 @@ def truncate_left(tokenize: Callable, prompt: str, *rest_of_prompt, limit: int =
     return prompt
 
 
-class Prompt:
-    def __init__(self, prompt: str, likelihood: float = 0.0, metadata: dict = None) -> None:
-        self.prompt = prompt
+class ControllerOutput:
+    def __init__(self, likelihood: float = 0.0, metadata: dict = None) -> None:
         self.likelihood = likelihood
         self.metadata = metadata
+
+
+class Prompt(ControllerOutput):
+    def __init__(self, prompt: str, likelihood: float = 0.0, metadata: dict = None) -> None:
+        super().__init__(likelihood=likelihood, metadata=metadata)
+        self.prompt = prompt
 
     def __str__(self) -> str:
         return self.prompt
 
     def __repr__(self) -> str:
-        return f"Prompt=>{self.__str__()}"
+        return f"Prompt⬇️\n{self.__str__()}"
 
 
-class Command:
+class Command(ControllerOutput):
     def __init__(self, cmd: str, likelihood: float = None, metadata: dict = None) -> None:
+        super().__init__(likelihood=likelihood, metadata=metadata)
         self.cmd = cmd
-        self.likelihood = likelihood
-        self.metadata = metadata
 
     def __str__(self) -> str:
         return self.cmd
 
     def __repr__(self) -> str:
-        return f"Command=>{self.__str__()}"
+        return f"Command⬇️\n{self.__str__()}"
 
 
 class DialogueState(Enum):
@@ -441,6 +445,8 @@ class Controller:
                     ],
                     topk=3,
                 )
+                # actions
+                breakpoint()
 
                 # if the model is confident enough, just assume the suggested action is correct
                 if (actions[0][0] - actions[1][0]) / -actions[1][0] > 1.0:
@@ -459,6 +465,7 @@ class Controller:
 
         elif self._step == DialogueState.ActionFeedback:
             if response == "y":
+                breakpoint()
                 pass
             elif response == "n":
                 if "click" in self._action:
@@ -628,6 +635,7 @@ class Controller:
         state = self._construct_state(url, pruned_elements)
         examples = self.gather_examples(state)
         prompt = self._construct_prompt(state, examples)
+        breakpoint()
 
         match self._step:
             case DialogueState.Command:
@@ -652,9 +660,10 @@ class Controller:
             self._generate_prioritization(page_elements, url)
 
         self._construct_responses(response=response)
-        action_or_prompt = self.pick_action(url, page_elements, response)
 
-        if isinstance(action_or_prompt, Prompt):
+        #
+        if isinstance(action_or_prompt := self.pick_action(url, page_elements, response), Prompt):
+            breakpoint()
             return action_or_prompt
 
         match self._action.strip():
