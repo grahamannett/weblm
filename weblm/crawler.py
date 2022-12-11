@@ -1,12 +1,8 @@
-import asyncio
 import json
 import re
 import time
-import uuid
-from dataclasses import dataclass, field
 from os.path import exists
 from sys import platform
-from typing import Any, List
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -132,15 +128,11 @@ class Crawler:
             if x_d or y_d:
                 self.page.evaluate(f"() => window.scrollTo({x_d}, {y_d})")
 
-<<<<<<< HEAD
             if x_d or y_d:
                 # not entirely sure this will work if there is scrolling
                 self.page.mouse.click(x - x_d, y - y_d)
             else:
                 self.page.mouse.click(x + element["origin_x"], y + element["origin_y"])
-=======
-            self.page.mouse.click(x - x_d, y - y_d)
->>>>>>> 5d98721 (dont need self on threaded func)
         else:
             print("Could not find element")
 
@@ -496,7 +488,6 @@ class Crawler:
             task_interface = TasksInterface()
             short_text_with_prompt = task_interface.summary(short_text)
             controller.use_text(short_text_with_prompt)
-
         elif cmd.startswith("click"):
             commasplit = cmd.split(",")
             id = commasplit[0].split(" ")[2]
@@ -511,4 +502,14 @@ class Crawler:
             text += "\n"
             self.type(id, text)
 
-        time.sleep(2)
+        time.sleep(1)
+
+
+class Scroller:
+    def __call__(self, direction: str):
+        return
+
+
+class CommandDispatch:
+    def __init__(self, crawler: Crawler) -> None:
+        self.crawler = crawler
