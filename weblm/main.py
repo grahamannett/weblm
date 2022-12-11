@@ -14,10 +14,9 @@ from typing import List, Union
 
 import cohere
 
-# from .controller import Command, Controller, Prompt
-from .controllers import Command, Controller, Prompt
-from .crawler import URL_PATTERN, Crawler
-from .data_saver import CSVSaver as DataSaver
+from weblm.controllers import Command, Controller, Prompt
+from weblm.crawler import URL_PATTERN, Crawler
+from weblm.data_saver import CSVSaver as DataSaver
 
 
 @dataclass
@@ -83,10 +82,12 @@ class WebLM:
             time.sleep(2)
 
         content = crawler.crawl()
+        state.content = content
 
         while len(content) == 0:
             content = crawler.crawl()
-        response = controller.step(crawler.page.url, content, response)
+
+        response = controller.step(crawler.page.url, content, response, prev_state=state)
 
         if isinstance(response, Command):
             crawler.run_cmd(str(response), controller=controller)

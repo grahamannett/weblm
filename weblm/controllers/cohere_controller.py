@@ -3,7 +3,10 @@ from typing import Callable, List
 import cohere
 from requests.exceptions import ConnectionError
 
-from .base import Controller, truncate_left
+
+from weblm.controllers.base import Controller, truncate_left
+
+AVAILABLE_MODELS = ["command-xlarge-20221108", "xlarge"]
 
 
 def make_fn(generate_func, tokenize_func, model):
@@ -38,21 +41,14 @@ def make_fn(generate_func, tokenize_func, model):
 
 def _generate_func(co_client: cohere.Client) -> Callable:
     return co_client.generate
-    # def _fn(prompt: str, **kwargs):
-    #     return co_client.generate(prompt=prompt, **kwargs)
-    # return _fn
 
 
 def _tokenize_func(co_client: cohere.Client) -> Callable:
     return co_client.tokenize
-    # def _fn(text: str, **kwargs):
-    #     return co_client.tokenize(text=text, **kwargs)
-
-    # return _fn
 
 
 class CohereController(Controller):
-    MODEL = "xlarge"
+    MODEL = "command-xlarge-20221108"
     cohere_client = None  # possible to get client without instantiating controller
 
     Controller.client_exception = cohere.error.CohereError
@@ -78,7 +74,7 @@ class CohereController(Controller):
         temperature: float = 0.5,
         num_generations: int = 5,
         max_tokens: int = 20,
-        stop_sequences: List[str] = ["\n"],
+        stop_sequences: List[str] = None,
         return_likelihoods: str = "GENERATION",
         **kwargs,
     ) -> cohere.generation.Generations:
