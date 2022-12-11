@@ -88,7 +88,7 @@ class WebLM:
             content = crawler.crawl()
 
         response = controller.step(crawler.page.url, content, response, prev_state=state)
-        breakpoint()
+
 
         if isinstance(response, Command):
             crawler.run_cmd(str(response), controller=controller)
