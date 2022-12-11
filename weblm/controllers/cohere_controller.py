@@ -4,9 +4,11 @@ import cohere
 from requests.exceptions import ConnectionError
 
 
-from weblm.controllers.base import Controller, truncate_left
+from weblm.controllers.controller import Controller, truncate_left
 
 AVAILABLE_MODELS = ["command-xlarge-20221108", "xlarge"]
+CLIENT_EXCEPTION = cohere.error.CohereError
+CLIENT_EXCEPTION_MESSAGE = "Cohere fucked up: {0}"
 
 
 def make_fn(generate_func, tokenize_func, model):
@@ -49,10 +51,10 @@ def _tokenize_func(co_client: cohere.Client) -> Callable:
 
 class CohereController(Controller):
     MODEL = "command-xlarge-20221108"
-    cohere_client = None  # possible to get client without instantiating controller
+    cohere_client = None  # make it possible to get client without instantiating controller
 
-    Controller.client_exception = cohere.error.CohereError
-    Controller.client_exception_message = "Cohere fucked up: {0}"
+    Controller.client_exception = CLIENT_EXCEPTION
+    Controller.client_exception_message = CLIENT_EXCEPTION_MESSAGE
 
     def __init__(self, co: cohere.Client, objective: str, **kwargs):
         super().__init__(objective, **kwargs)
@@ -61,7 +63,6 @@ class CohereController(Controller):
         if CohereController.cohere_client is None:
             CohereController.cohere_client = co
 
-        # self._fn = make_fn(generate_func=_generate_func(self.client), tokenize_func=self.tokenize, model=self.MODEL)
         self._fn = make_fn(generate_func=self.generate, tokenize_func=self.tokenize, model=self.MODEL)
 
     def embed(self, texts: List[str], truncate: str = "RIGHT") -> cohere.embeddings.Embeddings:
