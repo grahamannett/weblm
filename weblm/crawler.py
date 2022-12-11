@@ -40,42 +40,6 @@ def replace_special_fields(cmd):
     return cmd
 
 
-@dataclass
-class Element:
-    node_index: str
-    backend_node_id: int
-    node_name: str
-    node_value: Any
-    is_clickable: bool
-
-    origin_x: int
-    origin_y: int
-    center_x: int
-    center_y: int
-
-    node_meta: List[str] = field(default_factory=list)
-
-
-class ElementCapture:
-    def __init__(self):
-        self.folder = "screenshots"
-
-    def capture(self, page: Page, element: Element):
-        screenshot = page.screenshot(
-            clip={
-                "x": element.origin_x,
-                "y": element.origin_y,
-                "width": element.center_x,
-                "height": element.origin_y,
-            },
-            path=self.latest_file(),
-        )
-        return screenshot
-
-    def latest_file(self):
-        return f"{self.folder}/{str(uuid.uuid4())}.png"
-
-
 class Crawler:
     def __init__(self, keep_device_ratio: bool = False, headless: bool = False):
         self.browser = sync_playwright().start().chromium.launch(headless=headless)
